@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ClgBites Admin Panel</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #e8445a;
+    --primary-light: #fff0f2;
+    --green: #22c55e;
+    --green-light: #f0fdf4;
+    --yellow: #f59e0b;
+    --gray: #6b7280;
+    --gray-light: #f3f4f6;
+    --border: #e5e7eb;
+    --white: #ffffff;
+    --text: #111827;
+    --sidebar-w: 220px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: var(--text); }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f8fafc;
+  }
+  .login-card {
+    background: var(--white); border-radius: 16px; padding: 40px; width: 360px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+  .login-logo { text-align: center; margin-bottom: 28px; }
+  .login-logo h1 { color: var(--primary); font-size: 22px; font-weight: 700; }
+  .login-logo p  { color: var(--gray); font-size: 13px; margin-top: 4px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--gray); }
+  .form-group input {
+    width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 14px; outline: none; transition: border-color .2s;
+  }
+  .form-group input:focus { border-color: var(--primary); }
+  .btn-login {
+    width: 100%; padding: 12px; background: var(--primary); color: white; border: none;
+    border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px;
+    transition: opacity .2s;
+  }
+  .btn-login:hover { opacity: .9; }
+  .login-error { color: var(--primary); font-size: 13px; margin-top: 10px; text-align: center; }
+
+  /* ── LAYOUT ── */
+  #app { display: none; min-height: 100vh; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+    background: var(--white); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; z-index: 100; padding: 0 0 24px;
+  }
+  .sidebar-brand {
+    padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+  }
+  .sidebar-brand h2 { font-size: 16px; color: var(--primary); font-weight: 700; }
+  .sidebar-brand p  { font-size: 11px; color: var(--gray); margin-top: 2px; }
+  .sidebar-nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;
+    color: var(--gray); transition: all .15s; border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--gray-light); color: var(--text); }
+  .nav-item.active { background: var(--primary-light); color: var(--primary); }
+  .nav-icon { font-size: 16px; }
+  .sidebar-footer { padding: 0 10px; display: flex; flex-direction: column; gap: 8px; }
+  .btn-view-site, .btn-logout {
+    display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+    border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500;
+    width: 100%; transition: opacity .2s;
+  }
+  .btn-view-site { background: var(--gray-light); color: var(--text); }
+  .btn-logout    { background: #fef2f2; color: var(--primary); }
+
+  /* ── MAIN ── */
+  .main { margin-left: var(--sidebar-w); padding: 32px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;
+  }
+  .page-title { font-size: 22px; font-weight: 700; }
+  .orders-badge {
+    display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;
+    padding: 6px 12px; border-radius: 20px;
+  }
+  .orders-badge.open  { background: var(--green-light); color: var(--green); }
+  .orders-badge.closed { background: #fef2f2; color: var(--primary); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--white); border-radius: 12px; padding: 24px;
+    border: 1px solid var(--border); margin-bottom: 20px;
+  }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--white); border-radius: 12px; padding: 20px;
+    border-left: 4px solid var(--primary); border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .stat-card:nth-child(2) { border-left-color: var(--green); }
+  .stat-card:nth-child(3) { border-left-color: var(--yellow); }
+  .stat-card:nth-child(4) { border-left-color: #8b5cf6; }
+  .stat-num  { font-size: 32px; font-weight: 700; }
+  .stat-label { font-size: 13px; color: var(--gray); margin-top: 4px; }
+
+  /* ── TOGGLE SWITCH ── */
+  .toggle-wrap { display: flex; align-items: center; gap: 12px; }
+  .toggle { position: relative; width: 52px; height: 28px; }
+  .toggle input { display: none; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: #d1d5db; border-radius: 28px;
+    cursor: pointer; transition: background .25s;
+  }
+  .toggle-slider::before {
+    content: ""; position: absolute; left: 3px; top: 3px;
+    width: 22px; height: 22px; background: white; border-radius: 50%;
+    transition: transform .25s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .toggle input:checked + .toggle-slider { background: var(--primary); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(24px); }
+  .toggle-label { font-size: 13px; font-weight: 600; }
+
+  /* ── ACCEPTANCE BANNER ── */
+  .acceptance-banner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; transition: background .3s;
+  }
+  .acceptance-banner.open   { background: var(--green-light); border: 1px solid #bbf7d0; }
+  .acceptance-banner.closed { background: #fef2f2; border: 1px solid #fecaca; }
+  .banner-left { display: flex; align-items: center; gap: 14px; }
+  .banner-icon { font-size: 28px; }
+  .banner-title { font-size: 16px; font-weight: 700; }
+  .banner-sub   { font-size: 13px; color: var(--gray); margin-top: 2px; }
+
+  /* ── DELIVERY TIME ── */
+  .delivery-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .delivery-input {
+    flex: 1; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 14px; outline: none;
+  }
+  .delivery-input:focus { border-color: var(--primary); }
+  .btn-save {
+    padding: 10px 20px; background: var(--primary); color: white; border: none;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+
+  /* ── MENU ITEMS ── */
+  .menu-item-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .menu-item-row:last-child { border-bottom: none; }
+  .mi-left { display: flex; align-items: center; gap: 12px; }
+  .mi-name  { font-size: 14px; font-weight: 600; }
+  .mi-price { font-size: 13px; color: var(--gray); margin-top: 2px; }
+  .mi-right { display: flex; align-items: center; gap: 12px; }
+  .badge-avail {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+  }
+  .badge-avail.yes { background: var(--green-light); color: var(--green); }
+  .badge-avail.no  { background: #fef2f2; color: var(--primary); }
+  .edit-price-btn {
+    border: none; background: none; cursor: pointer; font-size: 14px; padding: 4px;
+    color: var(--gray); transition: color .2s;
+  }
+  .edit-price-btn:hover { color: var(--primary); }
+  .price-edit-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .price-edit-input {
+    width: 80px; padding: 4px 8px; border: 1.5px solid var(--primary);
+    border-radius: 6px; font-size: 13px; outline: none;
+  }
+  .btn-confirm-price {
+    padding: 4px 10px; background: var(--primary); color: white; border: none;
+    border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  .section-label {
+    font-size: 11px; font-weight: 700; color: var(--gray); text-transform: uppercase;
+    letter-spacing: .5px; padding: 12px 0 4px; margin-top: 4px;
+  }
+
+  /* ── ORDERS ── */
+  .order-card {
+    background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; margin-bottom: 14px;
+  }
+  .order-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .order-token { font-size: 18px; font-weight: 700; color: var(--primary); }
+  .order-name  { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .order-phone { font-size: 13px; color: var(--gray); }
+  .order-time  { font-size: 12px; color: var(--gray); text-align: right; }
+  .order-items-list { margin: 12px 0; padding: 10px 14px; background: var(--gray-light); border-radius: 8px; }
+  .order-item-line { font-size: 13px; padding: 2px 0; }
+  .order-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+  .order-total  { font-size: 15px; font-weight: 700; }
+  .status-badge {
+    font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px;
+  }
+  .status-badge.pending   { background: #fef9c3; color: #92400e; }
+  .status-badge.confirmed { background: var(--green-light); color: var(--green); }
+  .status-badge.cancelled { background: #fef2f2; color: var(--primary); }
+  .order-actions { display: flex; gap: 8px; }
+  .btn-confirm { padding: 7px 16px; background: var(--green); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-cancel  { padding: 7px 16px; background: var(--primary-light); color: var(--primary); border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .payment-tag { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: #e0f2fe; color: #0369a1; font-weight: 600; }
+
+  /* ── COUPONS ── */
+  .coupon-form { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 24px; }
+  .coupon-form .form-group { margin-bottom: 0; min-width: 130px; }
+  .coupon-form select {
+    width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 14px; outline: none; background: white;
+  }
+  .btn-create-coupon {
+    padding: 10px 20px; background: var(--primary); color: white; border: none;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .coupon-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .coupon-code  { font-size: 15px; font-weight: 700; letter-spacing: .5px; color: var(--primary); }
+  .coupon-meta  { font-size: 13px; color: var(--gray); margin-top: 2px; }
+  .coupon-right { display: flex; align-items: center; gap: 12px; }
+  .btn-del-coupon {
+    border: none; background: #fef2f2; color: var(--primary); border-radius: 6px;
+    padding: 5px 10px; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+
+  /* ── EXPORT ── */
+  .export-section { display: flex; gap: 16px; flex-wrap: wrap; }
+  .btn-export {
+    display: flex; align-items: center; gap: 8px; padding: 12px 24px;
+    background: #16a34a; color: white; border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+  }
+  .btn-export:hover { opacity: .85; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 2px; background: var(--gray-light); padding: 4px; border-radius: 10px; margin-bottom: 20px; width: fit-content; }
+  .tab { padding: 8px 18px; border-radius: 8px; border: none; background: none; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--gray); transition: all .2s; }
+  .tab.active { background: white; color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+  .filter-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .filter-select {
+    padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 13px; outline: none; background: white; cursor: pointer;
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; background: #1f2937; color: white;
+    padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
+    opacity: 0; transition: opacity .3s; z-index: 9999; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>🍛 ClgBites</h1>
+      <p>Admin Panel</p>
+    </div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="admin" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <button class="btn-login" onclick="doLogin()">Login →</button>
+    <p class="login-error" id="login-error"></p>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h2>🍛 ClgBites</h2>
+      <p>Admin Panel</p>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="showPage('overview')" id="nav-overview">
+        <span class="nav-icon">📊</span> Overview
+      </button>
+      <button class="nav-item" onclick="showPage('menu')" id="nav-menu">
+        <span class="nav-icon">🍽️</span> Menu Items
+      </button>
+      <button class="nav-item" onclick="showPage('orders')" id="nav-orders">
+        <span class="nav-icon">📦</span> Orders
+      </button>
+      <button class="nav-item" onclick="showPage('coupons')" id="nav-coupons">
+        <span class="nav-icon">🎟️</span> Coupons
+      </button>
+      <button class="nav-item" onclick="showPage('export')" id="nav-export">
+        <span class="nav-icon">📥</span> Export
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-view-site" onclick="window.open(FRONTEND_URL,'_blank')">← View Site</button>
+      <button class="btn-logout" onclick="doLogout()">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ─ OVERVIEW ─ -->
+    <div class="page active" id="page-overview">
+      <div class="page-header">
+        <h1 class="page-title">📊 Overview</h1>
+        <div class="orders-badge open" id="orders-status-badge">
+          <span class="dot"></span> Orders Open
+        </div>
+      </div>
+
+      <!-- Acceptance toggle -->
+      <div class="acceptance-banner open" id="acceptance-banner">
+        <div class="banner-left">
+          <span class="banner-icon" id="banner-icon">✅</span>
+          <div>
+            <div class="banner-title" id="banner-title">Order Acceptance</div>
+            <div class="banner-sub" id="banner-sub">Customers can place orders right now</div>
+          </div>
+        </div>
+        <div class="toggle-wrap">
+          <label class="toggle">
+            <input type="checkbox" id="orders-toggle" checked onchange="toggleOrders(this.checked)" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label" id="toggle-label-txt">ON</span>
+        </div>
+      </div>
+
+      <!-- Delivery time -->
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:4px;">🚚 Delivery Time (shown to all customers)</div>
+        <div style="font-size:13px;color:var(--gray);margin-bottom:12px;">This is displayed on the home page for all users</div>
+        <div class="delivery-row">
+          <input class="delivery-input" type="text" id="delivery-time-input" placeholder="e.g. 7:30-8:30" />
+          <button class="btn-save" onclick="saveDeliveryTime()">💾 Save</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-num" id="stat-total">—</div>
+          <div class="stat-label">Total Orders</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-confirmed">—</div>
+          <div class="stat-label">Confirmed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-pending">—</div>
+          <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-revenue">—</div>
+          <div class="stat-label">Revenue (Confirmed)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─ MENU ITEMS ─ -->
+    <div class="page" id="page-menu">
+      <div class="page-header">
+        <h1 class="page-title">🍽️ Menu Items</h1>
+        <div class="orders-badge open" id="orders-status-badge-menu">
+          <span class="dot"></span> Orders Open
+        </div>
+      </div>
+      <div class="card" style="padding:16px 24px;">
+        <p style="font-size:13px;color:var(--gray);margin-bottom:4px;">
+          Toggle items on/off. Disabled items show as "Unavailable" to customers.
+        </p>
+      </div>
+      <div class="card" id="menu-list" style="padding:16px 24px;">
+        <p style="color:var(--gray)">Loading menu…</p>
+      </div>
+    </div>
+
+    <!-- ─ ORDERS ─ -->
+    <div class="page" id="page-orders">
+      <div class="page-header">
+        <h1 class="page-title">📦 Orders</h1>
+        <button class="btn-save" onclick="loadOrders()">🔄 Refresh</button>
+      </div>
+      <div class="filter-row">
+        <select class="filter-select" id="order-filter" onchange="renderOrders()">
+          <option value="all">All Orders</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div id="orders-list"><p style="color:var(--gray)">Loading orders…</p></div>
+    </div>
+
+    <!-- ─ COUPONS ─ -->
+    <div class="page" id="page-coupons">
+      <div class="page-header">
+        <h1 class="page-title">🎟️ Coupons</h1>
+      </div>
+      <div class="card">
+        <div style="font-weight:700;font-size:15px;margin-bottom:16px;">Create New Coupon</div>
+        <div class="coupon-form">
+          <div class="form-group">
+            <label>Code</label>
+            <input type="text" id="c-code" placeholder="SAVE50" style="padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;width:100%;" />
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="c-type">
+              <option value="flat">Flat (₹)</option>
+              <option value="percent">Percent (%)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Value</label>
+            <input type="number" id="c-value" placeholder="50" style="padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;width:100px;" />
+          </div>
+          <div class="form-group">
+            <label>Max Uses</label>
+            <input type="number" id="c-uses" placeholder="1" value="1" style="padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;width:100px;" />
+          </div>
+          <div class="form-group">
+            <label>Expires (optional)</label>
+            <input type="date" id="c-expires" style="padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;" />
+          </div>
+          <button class="btn-create-coupon" onclick="createCoupon()">+ Create Coupon</button>
+        </div>
+      </div>
+      <div class="card" id="coupons-list" style="padding:16px 24px;">
+        <p style="color:var(--gray)">Loading coupons…</p>
+      </div>
+    </div>
+
+    <!-- ─ EXPORT ─ -->
+    <div class="page" id="page-export">
+      <div class="page-header">
+        <h1 class="page-title">📥 Export Data</h1>
+      </div>
+      <div class="card">
+        <div style="font-weight:700;font-size:15px;margin-bottom:8px;">Excel Reports</div>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:20px;">
+          Download all orders, order items and summary in a single Excel file.<br>
+          A daily report is also automatically emailed every night at 11:30 PM.
+        </p>
+        <div class="export-section">
+          <button class="btn-export" onclick="downloadExcel()">
+            📊 Download Excel Now
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── CONFIG — change this to your Railway backend URL ──
+const API = "https://YOUR-RAILWAY-BACKEND.up.railway.app";
+const FRONTEND_URL = "https://YOUR-VERCEL-FRONTEND.vercel.app";
+
+let TOKEN = localStorage.getItem("clgbites_token") || "";
+let allOrders = [];
+
+/* ─── HELPERS ─── */
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2800);
+}
+
+async function api(method, path, body) {
+  const res = await fetch(API + path, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(TOKEN ? { Authorization: "Bearer " + TOKEN } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json();
+}
+
+/* ─── AUTH ─── */
+async function doLogin() {
+  const username = document.getElementById("login-user").value.trim();
+  const password = document.getElementById("login-pass").value;
+  if (!username || !password) return;
+  const data = await api("POST", "/api/auth/login", { username, password });
+  if (data.token) {
+    TOKEN = data.token;
+    localStorage.setItem("clgbites_token", TOKEN);
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+    initApp();
+  } else {
+    document.getElementById("login-error").textContent = data.error || "Login failed";
+  }
+}
+
+function doLogout() {
+  TOKEN = "";
+  localStorage.removeItem("clgbites_token");
+  document.getElementById("app").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+}
+
+/* ─── INIT ─── */
+async function initApp() {
+  await loadSettings();
+  await loadStats();
+  await loadMenu();
+  await loadOrders();
+  await loadCoupons();
+}
+
+/* ─── NAVIGATION ─── */
+function showPage(name) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.getElementById("page-" + name).classList.add("active");
+  document.getElementById("nav-" + name).classList.add("active");
+}
+
+/* ─── SETTINGS ─── */
+async function loadSettings() {
+  const s = await api("GET", "/api/settings");
+  if (!s) return;
+  const open = !!s.orders_open;
+  document.getElementById("orders-toggle").checked = open;
+  document.getElementById("delivery-time-input").value = s.delivery_time || "";
+  updateOrderStatusUI(open);
+}
+
+function updateOrderStatusUI(open) {
+  const banner = document.getElementById("acceptance-banner");
+  const badge  = document.getElementById("orders-status-badge");
+  const label  = document.getElementById("toggle-label-txt");
+  const icon   = document.getElementById("banner-icon");
+  const sub    = document.getElementById("banner-sub");
+  const title  = document.getElementById("banner-title");
+
+  banner.className = "acceptance-banner " + (open ? "open" : "closed");
+  badge.className  = "orders-badge " + (open ? "open" : "closed");
+  badge.innerHTML  = `<span class="dot"></span> ${open ? "Orders Open" : "Orders Closed"}`;
+  label.textContent = open ? "ON" : "OFF";
+  icon.textContent  = open ? "✅" : "🚫";
+  title.textContent = "Order Acceptance";
+  sub.textContent   = open ? "Customers can place orders right now" : "Orders are currently paused";
+}
+
+async function toggleOrders(checked) {
+  updateOrderStatusUI(checked);
+  const s = await api("GET", "/api/settings");
+  await api("PUT", "/api/settings", {
+    orders_open: checked,
+    delivery_time: document.getElementById("delivery-time-input").value
+  });
+  toast(checked ? "✅ Orders opened!" : "🚫 Orders paused!");
+}
+
+async function saveDeliveryTime() {
+  const t = document.getElementById("delivery-time-input").value.trim();
+  if (!t) return;
+  const open = document.getElementById("orders-toggle").checked;
+  await api("PUT", "/api/settings", { orders_open: open, delivery_time: t });
+  toast("✅ Delivery time saved!");
+}
+
+/* ─── STATS ─── */
+async function loadStats() {
+  const s = await api("GET", "/api/orders/stats");
+  if (!s) return;
+  document.getElementById("stat-total").textContent     = s.total_orders || 0;
+  document.getElementById("stat-confirmed").textContent = s.confirmed || 0;
+  document.getElementById("stat-pending").textContent   = s.pending || 0;
+  document.getElementById("stat-revenue").textContent   = "₹" + (s.revenue || 0);
+}
+
+/* ─── MENU ─── */
+async function loadMenu() {
+  const items = await api("GET", "/api/menu");
+  if (!Array.isArray(items)) return;
+
+  const CATEGORIES = {
+    biryani:   { label: "Biryani", emoji: "🍚" },
+    pulaoRice: { label: "Pulao & Fried Rice", emoji: "🍛" },
+    tandoori:  { label: "Tandoori Specialties", emoji: "🔥" },
+  };
+
+  const grouped = {};
+  for (const item of items) {
+    if (!grouped[item.category]) grouped[item.category] = [];
+    grouped[item.category].push(item);
+  }
+
+  let html = "";
+  for (const [cat, catItems] of Object.entries(grouped)) {
+    const meta = CATEGORIES[cat] || { label: cat, emoji: "🍽️" };
+    html += `<div class="section-label">${meta.emoji} ${meta.label}</div>`;
+    for (const item of catItems) {
+      html += menuItemHTML(item);
+    }
+  }
+
+  document.getElementById("menu-list").innerHTML = html || "<p>No items.</p>";
+}
+
+function menuItemHTML(item) {
+  return `
+  <div class="menu-item-row" id="mi-${item.id}">
+    <div class="mi-left">
+      <div>
+        <div class="mi-name">${item.name}</div>
+        <div id="mi-price-display-${item.id}" class="mi-price">₹${item.price}
+          <button class="edit-price-btn" title="Edit price" onclick="showPriceEdit('${item.id}',${item.price})">✏️</button>
+        </div>
+        <div id="mi-price-edit-${item.id}" style="display:none;" class="price-edit-row">
+          <span>₹</span>
+          <input class="price-edit-input" type="number" id="mi-price-input-${item.id}" value="${item.price}" />
+          <button class="btn-confirm-price" onclick="savePrice('${item.id}')">Save</button>
+          <button class="btn-confirm-price" style="background:var(--gray)" onclick="hidePriceEdit('${item.id}')">✕</button>
+        </div>
+      </div>
+    </div>
+    <div class="mi-right">
+      <span class="badge-avail ${item.available ? 'yes' : 'no'}" id="mi-badge-${item.id}">
+        ${item.available ? 'Available' : 'Unavailable'}
+      </span>
+      <label class="toggle">
+        <input type="checkbox" ${item.available ? 'checked' : ''} onchange="toggleMenuItem('${item.id}',this.checked)" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>`;
+}
+
+function showPriceEdit(id, price) {
+  document.getElementById(`mi-price-display-${id}`).style.display = "none";
+  document.getElementById(`mi-price-edit-${id}`).style.display = "flex";
+  document.getElementById(`mi-price-input-${id}`).focus();
+}
+function hidePriceEdit(id) {
+  document.getElementById(`mi-price-display-${id}`).style.display = "";
+  document.getElementById(`mi-price-edit-${id}`).style.display = "none";
+}
+async function savePrice(id) {
+  const price = document.getElementById(`mi-price-input-${id}`).value;
+  const res = await api("PUT", `/api/menu/${id}/price`, { price: parseInt(price) });
+  if (res.id) {
+    document.getElementById(`mi-price-display-${id}`).innerHTML =
+      `₹${res.price} <button class="edit-price-btn" onclick="showPriceEdit('${id}',${res.price})">✏️</button>`;
+    hidePriceEdit(id);
+    toast("✅ Price updated!");
+  }
+}
+
+async function toggleMenuItem(id, checked) {
+  const res = await api("PUT", `/api/menu/${id}/toggle`, {});
+  const badge = document.getElementById(`mi-badge-${id}`);
+  if (badge) {
+    badge.textContent = res.available ? "Available" : "Unavailable";
+    badge.className = `badge-avail ${res.available ? 'yes' : 'no'}`;
+  }
+  toast(res.available ? "✅ Item enabled!" : "🚫 Item disabled!");
+}
+
+/* ─── ORDERS ─── */
+async function loadOrders() {
+  const orders = await api("GET", "/api/orders");
+  allOrders = Array.isArray(orders) ? orders : [];
+  renderOrders();
+  loadStats();
+}
+
+function renderOrders() {
+  const filter = document.getElementById("order-filter").value;
+  const list = filter === "all" ? allOrders : allOrders.filter(o => o.status === filter);
+
+  if (!list.length) {
+    document.getElementById("orders-list").innerHTML =
+      `<p style="color:var(--gray);padding:20px 0;">No orders found.</p>`;
+    return;
+  }
+
+  document.getElementById("orders-list").innerHTML = list.map(order => `
+    <div class="order-card" id="order-card-${order.id}">
+      <div class="order-top">
+        <div>
+          <div class="order-token">${order.token}</div>
+          <div class="order-name">👤 ${order.customer_name}</div>
+          <div class="order-phone">📞 ${order.customer_phone}</div>
+        </div>
+        <div class="order-time">
+          ${order.ordered_at}<br>
+          <span class="status-badge ${order.status}">${order.status.toUpperCase()}</span><br>
+          <span class="payment-tag" style="margin-top:6px;display:inline-block;">
+            ${order.payment_mode === 'cod' ? '💵 COD' : '📲 Prepaid'}
+          </span>
+        </div>
+      </div>
+      <div class="order-items-list">
+        ${(order.items || []).map(i => `
+          <div class="order-item-line">• ${i.item_name} ×${i.qty} = ₹${i.price * i.qty}</div>
+        `).join("")}
+        ${order.coupon_code ? `<div class="order-item-line" style="color:var(--green)">🎟️ Coupon: ${order.coupon_code} (−₹${order.discount})</div>` : ""}
+      </div>
+      <div class="order-footer">
+        <div class="order-total">Total: ₹${order.total}</div>
+        <div class="order-actions">
+          ${order.status === 'pending' ? `
+            <button class="btn-confirm" onclick="updateOrderStatus(${order.id},'confirmed')">✅ Confirm</button>
+            <button class="btn-cancel"  onclick="updateOrderStatus(${order.id},'cancelled')">✕ Cancel</button>
+          ` : ""}
+          ${order.status === 'confirmed' ? `
+            <button class="btn-cancel" onclick="updateOrderStatus(${order.id},'cancelled')">✕ Cancel</button>
+          ` : ""}
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function updateOrderStatus(id, status) {
+  const res = await api("PUT", `/api/orders/${id}/status`, { status });
+  if (res.id) {
+    const order = allOrders.find(o => o.id === id);
+    if (order) order.status = status;
+    renderOrders();
+    loadStats();
+    toast(status === "confirmed" ? "✅ Order confirmed!" : "🚫 Order cancelled");
+  }
+}
+
+/* ─── COUPONS ─── */
+async function loadCoupons() {
+  const coupons = await api("GET", "/api/coupons");
+  if (!Array.isArray(coupons)) return;
+
+  if (!coupons.length) {
+    document.getElementById("coupons-list").innerHTML = "<p style='color:var(--gray)'>No coupons yet. Create one above!</p>";
+    return;
+  }
+
+  document.getElementById("coupons-list").innerHTML = coupons.map(c => `
+    <div class="coupon-row" id="coupon-${c.id}">
+      <div>
+        <div class="coupon-code">${c.code}</div>
+        <div class="coupon-meta">
+          ${c.discount_type === 'flat' ? `₹${c.discount_value} off` : `${c.discount_value}% off`}
+          &nbsp;·&nbsp; Used ${c.uses_count}/${c.max_uses === 0 ? '∞' : c.max_uses}
+          ${c.expires_at ? ` &nbsp;·&nbsp; Expires ${c.expires_at.slice(0,10)}` : ""}
+        </div>
+      </div>
+      <div class="coupon-right">
+        <label class="toggle">
+          <input type="checkbox" ${c.active ? 'checked' : ''} onchange="toggleCoupon(${c.id},this.checked)" />
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn-del-coupon" onclick="deleteCoupon(${c.id})">🗑 Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function createCoupon() {
+  const code  = document.getElementById("c-code").value.trim();
+  const type  = document.getElementById("c-type").value;
+  const value = parseInt(document.getElementById("c-value").value);
+  const uses  = parseInt(document.getElementById("c-uses").value) || 1;
+  const exp   = document.getElementById("c-expires").value || null;
+
+  if (!code || !value) return toast("⚠️ Code and value required");
+
+  const res = await api("POST", "/api/coupons", {
+    code, discount_type: type, discount_value: value, max_uses: uses, expires_at: exp,
+  });
+  if (res.success) {
+    toast("✅ Coupon created: " + res.code);
+    document.getElementById("c-code").value = "";
+    document.getElementById("c-value").value = "";
+    loadCoupons();
+  } else {
+    toast("❌ " + (res.error || "Failed"));
+  }
+}
+
+async function toggleCoupon(id, active) {
+  await api("PUT", `/api/coupons/${id}/toggle`, {});
+  toast(active ? "✅ Coupon activated" : "🚫 Coupon deactivated");
+}
+
+async function deleteCoupon(id) {
+  if (!confirm("Delete this coupon?")) return;
+  await api("DELETE", `/api/coupons/${id}`, {});
+  toast("🗑 Coupon deleted");
+  loadCoupons();
+}
+
+/* ─── EXPORT ─── */
+async function downloadExcel() {
+  const url = `${API}/api/export/excel`;
+  const res = await fetch(url, { headers: { Authorization: "Bearer " + TOKEN } });
+  if (!res.ok) { toast("❌ Export failed"); return; }
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `clgbites-orders-${new Date().toISOString().slice(0,10)}.xlsx`;
+  a.click();
+  toast("✅ Excel downloaded!");
+}
+
+/* ─── BOOT ─── */
+if (TOKEN) {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  initApp();
+}
+</script>
+</body>
+</html>

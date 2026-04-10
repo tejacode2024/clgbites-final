@@ -411,36 +411,14 @@ function AdminPage({ onExit }: { onExit: () => void }) {
     patchConfig({ item_flags: newFlags });
   };
 
-  const exportAndClear = async () => {
-    if (!window.confirm("Export all orders to Excel and clear the database? This cannot be undone.")) return;
-    setExporting(true);
-    try {
-      const r = await fetch(`${API}/api/export`, {
-        method: "POST",
-        headers: { "x-admin-secret": adminSecret.current },
-      });
-      if (r.headers.get("Content-Type")?.includes("spreadsheet")) {
-        const blob = await r.blob();
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement("a");
-        a.href     = url;
-        a.download = `clgbites_orders_${new Date().toLocaleDateString("en-CA")}.xlsx`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setOrders([]);
-        setStatusMsg("Exported & cleared ✓");
-        setTimeout(() => setStatusMsg(""), 3000);
-      } else {
-        const j = await r.json();
-        setStatusMsg(j.message || "No orders to export");
-        setTimeout(() => setStatusMsg(""), 3000);
-      }
-    } catch {
-      setStatusMsg("Export failed ✗");
-    }
-    setExporting(false);
-  };
+  const exportAndClear = () => {
+  setExporting(true)
+  window.open('/api/export', '_blank')
 
+  setTimeout(() => {
+    setExporting(false)
+  }, 1500)
+}
   const todayTotal = orders.reduce((s: number, o: any) => s + (o.total ?? 0), 0);
 
   if (!authed) {

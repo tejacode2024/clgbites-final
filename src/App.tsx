@@ -413,7 +413,7 @@ function AdminPage({ onExit }: { onExit: () => void }) {
 
   const exportAndClear = () => {
   setExporting(true)
-  window.open('/api/export', '_blank')
+  window.location.href = window.location.origin + '/api/export'
 
   setTimeout(() => {
     setExporting(false)

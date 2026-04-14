@@ -479,13 +479,17 @@ function AdminMenuItems({ itemFlags, toggleItem }: {
   );
 }
 
+
 /* ══════════════════════════════════════════════════════════════════════════
    ORDERS TAB
 ══════════════════════════════════════════════════════════════════════════ */
 function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }: {
   orders: any[]; loading: boolean; onRefresh: () => void;
   onExportAndClear: () => void; exporting: boolean;
+  
 }) {
+  const [payMap, setPayMap] = useState({})
+const [tokenMap, setTokenMap] = useState({})
   const [search, setSearch] = useState("");
   const filtered = orders.filter((o: any) =>
     o.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -563,66 +567,102 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
     })}
   </p>
 {o.deliver_status !== "delivered" ? (
-  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+  <div>
 
-    {/* Pay Status */}
-    {o.pay_status !== "paid" ? (
-      <button
-        onClick={async () => {
-          await fetch(`${API}/api/orders`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: o.id, pay_status: "paid" })
-          });
-          onRefresh();
-        }}
-        style={{
-          background: "#E8762C", color: "#fff", border: "none",
-          padding: "5px 12px", borderRadius: 8, fontSize: 11,
-          fontWeight: 600, cursor: "pointer"
-        }}
-      >
-        💰 Mark Paid
-      </button>
-    ) : (
-      <span style={{ fontSize: 11, color: "#28A745", fontWeight: 600 }}>✓ Paid</span>
-    )}
+    {/* RADIO */}
+    <label>
+      <input
+        type="radio"
+        name={`pay-${o.id}`}
+        checked={payMap[o.id] === "paid"}
+        onChange={() =>
+          setPayMap(prev => ({ ...prev, [o.id]: "paid" }))
+        }
+      />
+      Paid
+    </label>
 
-    {/* Deliver button — only enabled after paid */}
+    <label style={{ marginLeft: "10px" }}>
+      <input
+        type="radio"
+        name={`pay-${o.id}`}
+        checked={payMap[o.id] === "unpaid"}
+        onChange={() =>
+          setPayMap(prev => ({ ...prev, [o.id]: "unpaid" }))
+        }
+      />
+      Unpaid
+    </label>
+
+    {/* TOKEN */}
+    <input
+      type="number"
+      placeholder="Token No"
+      value={tokenMap[o.id] || ""}
+      onChange={(e) =>
+        setTokenMap(prev => ({
+          ...prev,
+          [o.id]: Number(e.target.value)
+        }))
+      }
+      style={{ marginLeft: "10px" }}
+    />
+
+    {/* BUTTON */}
     <button
-      disabled={o.pay_status !== "paid"}
       onClick={async () => {
-        await fetch(`${API}/api/orders`, {
+        const pay = payMap[o.id]
+        const token = tokenMap[o.id]
+
+        if (!pay) {
+          alert("Select payment status")
+          return
+        }
+
+        if (!token) {
+          alert("Enter token number")
+          return
+        }
+
+        await fetch("/api/orders", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
             id: o.id,
             deliver_status: "delivered",
+            pay_status: pay,
+            token_number: token
           })
-        });
-        onRefresh();
+        })
+
+        onRefresh()
       }}
       style={{
-        background: o.pay_status === "paid" ? "#22c55e" : "#C8BBAA",
-        color: "#fff", border: "none", padding: "6px 12px",
-        borderRadius: 8, fontSize: 12, fontWeight: 600,
-        cursor: o.pay_status === "paid" ? "pointer" : "not-allowed",
-        opacity: o.pay_status === "paid" ? 1 : 0.6
+        marginLeft: "10px",
+        background: "#22c55e",
+        color: "#fff",
+        border: "none",
+        padding: "4px 10px",
+        borderRadius: "6px",
+        cursor: "pointer"
       }}
     >
-      🚀 Delivered
+      Deliver
     </button>
 
   </div>
 ) : (
-  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-    <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>✓ Delivered</span>
+  <div style={{ textAlign: "right" }}>
+    <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>
+      ✓ Delivered
+    </span>
+
     {o.delivered_at && (
-      <span style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
-        {new Date(o.delivered_at).toLocaleString("en-IN", {
-          day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-        })}
-      </span>
+      <div style={{ fontSize: 10, color: "#64748b" }}>
+        {new Date(o.delivered_at).toLocaleString("en-IN")}
+      </div>
     )}
   </div>
 )}

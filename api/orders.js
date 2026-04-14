@@ -6,8 +6,6 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-
-  // GET ORDERS
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('orders')
@@ -16,10 +14,9 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error })
 
-    return res.status(200).json(data)
+    res.status(200).json(data)
   }
 
-  // CREATE ORDER
   if (req.method === 'POST') {
     const { data, error } = await supabase
       .from('orders')
@@ -28,28 +25,6 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error })
 
-    return res.status(200).json(data)
+    res.status(200).json(data)
   }
-
-  // UPDATE DELIVERED
- if (req.method === 'PATCH') {
-  const { id, deliver_status } = req.body
-
-  console.log("PATCH BODY:", req.body)
-
-  const { data, error } = await supabase
-    .from('orders')
-    .update({
-      deliver_status,
-      delivered_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .select()
-
-  console.log("PATCH RESULT:", data, error)
-
-  if (error) return res.status(500).json({ error })
-
-  return res.status(200).json(data)
-}
 }

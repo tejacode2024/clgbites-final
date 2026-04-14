@@ -27,14 +27,27 @@ export default async function handler(req, res) {
       { header: 'Time', key: 'created_at', width: 25 }
     ]
 
-    orders.forEach(order => {
+    // orders.forEach(order => {
+    //   worksheet.addRow({
+    //     name: order.name,
+    //     phone: order.phone,
+    //     items: JSON.stringify(order.items),
+    //     total: order.total,
+    //     payment: order.payment,
+    //     created_at: new Date(order.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
+  
+    //   })
+    // })
+
+ orders.forEach(order => {
       worksheet.addRow({
-        name: order.name,
-        phone: order.phone,
-        items: JSON.stringify(order.items),
+       name: order.customer_name,      // ✅ fixed
+    phone: order.customer_phone,
+         items: (order.items ?? []).map(i => `${i.name} x${i.qty}`).join(", "),
         total: order.total,
-        payment: order.payment,
-        created_at: order.created_at
+         payment: order.payment_mode,  
+        created_at: new Date(order.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
+  
       })
     })
 

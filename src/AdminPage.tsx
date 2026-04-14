@@ -563,60 +563,46 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
     })}
   </p>
 {o.deliver_status !== "delivered" ? (
-  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+  <button
+    onClick={async () => {
+      const choice = window.prompt(
+        `Order #${String(o.id).slice(-3)} — ${o.customer_name}\n\nEnter payment status:\n  1 = Paid & Delivered\n  2 = Unpaid & Delivered\n  3 = Not Delivered (cancel)`
+      );
 
-    {/* Pay Status */}
-    {o.pay_status !== "paid" ? (
-      <button
-        onClick={async () => {
-          await fetch(`${API}/api/orders`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: o.id, pay_status: "paid" })
-          });
-          onRefresh();
-        }}
-        style={{
-          background: "#E8762C", color: "#fff", border: "none",
-          padding: "5px 12px", borderRadius: 8, fontSize: 11,
-          fontWeight: 600, cursor: "pointer"
-        }}
-      >
-        💰 Mark Paid
-      </button>
-    ) : (
-      <span style={{ fontSize: 11, color: "#28A745", fontWeight: 600 }}>✓ Paid</span>
-    )}
+      if (!choice || choice.trim() === "3" || choice.trim() === "") return;
 
-    {/* Deliver button — only enabled after paid */}
-    <button
-      disabled={o.pay_status !== "paid"}
-      onClick={async () => {
-        await fetch(`${API}/api/orders`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: o.id,
-            deliver_status: "delivered",
-          })
-        });
-        onRefresh();
-      }}
-      style={{
-        background: o.pay_status === "paid" ? "#22c55e" : "#C8BBAA",
-        color: "#fff", border: "none", padding: "6px 12px",
-        borderRadius: 8, fontSize: 12, fontWeight: 600,
-        cursor: o.pay_status === "paid" ? "pointer" : "not-allowed",
-        opacity: o.pay_status === "paid" ? 1 : 0.6
-      }}
-    >
-      🚀 Delivered
-    </button>
+      const pay_status = choice.trim() === "1" ? "paid" : "unpaid";
 
-  </div>
+      await fetch(`${API}/api/orders`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: o.id,
+          deliver_status: "delivered",
+          pay_status,
+          delivered_at: new Date().toISOString()
+        })
+      });
+
+      onRefresh();
+    }}
+    style={{
+      background: "#22c55e", color: "#fff", border: "none",
+      padding: "6px 12px", borderRadius: 8, fontSize: 12,
+      fontWeight: 600, cursor: "pointer"
+    }}
+  >
+    Delivered
+  </button>
 ) : (
   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
     <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>✓ Delivered</span>
+    <span style={{
+      fontSize: 11, fontWeight: 600, marginTop: 2,
+      color: o.pay_status === "paid" ? "#28A745" : "#E8882C"
+    }}>
+      {o.pay_status === "paid" ? "💰 Paid" : "⏳ Unpaid"}
+    </span>
     {o.delivered_at && (
       <span style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
         {new Date(o.delivered_at).toLocaleString("en-IN", {

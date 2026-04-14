@@ -97,36 +97,38 @@ export default async function handler(req, res) {
 
   // ✅ CREATE ORDER (FIXED)
   if (req.method === 'POST') {
-    const {
-      customer_name,
-      customer_phone,
-      items,
-      payment_mode,
-      total
-    } = req.body
+  console.log("BODY:", req.body)
 
-    const { data, error } = await supabase
-      .from('orders')
-      .insert([
-        {
-          customer_name,
-          customer_phone,
-          items,
-          payment_mode,
-          total,
-          pay_status: "unpaid",
-          deliver_status: "pending"
-        }
-      ])
-      .select()
+  const {
+    customer_name,
+    customer_phone,
+    items,
+    payment_mode,
+    total
+  } = req.body
 
-    if (error) {
-      console.error("INSERT ERROR:", error)
-      return res.status(500).json({ error })
-    }
+  const { data, error } = await supabase
+    .from('orders')
+    .insert([
+      {
+        customer_name,
+        customer_phone,
+        items,
+        payment_mode,
+        total,
+        pay_status: "unpaid",
+        deliver_status: "pending"
+      }
+    ])
+    .select()
 
-    return res.status(200).json(data)
+  if (error) {
+    console.error("INSERT ERROR:", error)
+    return res.status(500).json({ error })
   }
+
+  return res.status(200).json(data)
+}
 
   // ✅ UPDATE ORDER (DELIVER + PAYMENT + TOKEN)
   if (req.method === 'PATCH') {

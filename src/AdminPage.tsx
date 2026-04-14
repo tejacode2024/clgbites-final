@@ -563,89 +563,70 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
     })}
   </p>
 {o.deliver_status !== "delivered" ? (
-  <div>
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
 
-    {/* ✅ RADIO BUTTON */}
-    <label>
-      <input
-        type="radio"
-        name={`pay-${o.id}`}
-        onChange={() =>
-          setPayMap(prev => ({ ...prev, [o.id]: "paid" }))
-        }
-      />
-      Paid
-    </label>
+    {/* Pay Status */}
+    {o.pay_status !== "paid" ? (
+      <button
+        onClick={async () => {
+          await fetch(`${API}/api/orders`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: o.id, pay_status: "paid" })
+          });
+          onRefresh();
+        }}
+        style={{
+          background: "#E8762C", color: "#fff", border: "none",
+          padding: "5px 12px", borderRadius: 8, fontSize: 11,
+          fontWeight: 600, cursor: "pointer"
+        }}
+      >
+        💰 Mark Paid
+      </button>
+    ) : (
+      <span style={{ fontSize: 11, color: "#28A745", fontWeight: 600 }}>✓ Paid</span>
+    )}
 
-    <label style={{ marginLeft: "10px" }}>
-      <input
-        type="radio"
-        name={`pay-${o.id}`}
-        onChange={() =>
-          setPayMap(prev => ({ ...prev, [o.id]: "unpaid" }))
-        }
-      />
-      Unpaid
-    </label>
-
-    {/* ✅ TOKEN INPUT */}
-    <input
-      type="number"
-      placeholder="Token No"
-      onChange={(e) =>
-        setTokenMap(prev => ({
-          ...prev,
-          [o.id]: Number(e.target.value)
-        }))
-      }
-      style={{ marginLeft: "10px" }}
-    />
-
-    {/* ✅ DELIVER BUTTON */}
+    {/* Deliver button — only enabled after paid */}
     <button
+      disabled={o.pay_status !== "paid"}
       onClick={async () => {
-
-        const pay = payMap[o.id]
-        const token = tokenMap[o.id]
-
-        if (!pay) {
-          alert("Select payment status")
-          return
-        }
-
-        await fetch("/api/orders", {
+        await fetch(`${API}/api/orders`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: o.id,
             deliver_status: "delivered",
-            pay_status: pay,
-            token_number: token
           })
-        })
-
-        onRefresh()
+        });
+        onRefresh();
+      }}
+      style={{
+        background: o.pay_status === "paid" ? "#22c55e" : "#C8BBAA",
+        color: "#fff", border: "none", padding: "6px 12px",
+        borderRadius: 8, fontSize: 12, fontWeight: 600,
+        cursor: o.pay_status === "paid" ? "pointer" : "not-allowed",
+        opacity: o.pay_status === "paid" ? 1 : 0.6
       }}
     >
-      Delivered
+      🚀 Delivered
     </button>
 
   </div>
 ) : (
-  <div style={{ textAlign: "right" }}>
-    <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>
-      ✓ Delivered
-    </span>
-
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+    <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>✓ Delivered</span>
     {o.delivered_at && (
-      <div style={{ fontSize: 10, color: "#64748b" }}>
-        {new Date(o.delivered_at).toLocaleString("en-IN")}
-      </div>
+      <span style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
+        {new Date(o.delivered_at).toLocaleString("en-IN", {
+          day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+        })}
+      </span>
     )}
   </div>
 )}
+
 </div>
 </div>
 </div>

@@ -555,11 +555,80 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
                   ))}
                 </div>
 
-                <p style={{ fontSize: 11, color: "#C4B49E", margin: 0 }}>
-                  {new Date(o.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour12: true })}
-                </p>
-              </div>
-            </div>
+             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+  <p style={{ fontSize: 11, color: "#C4B49E", margin: 0 }}>
+    {new Date(o.created_at).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour12: true
+    })}
+  </p>
+
+{o.deliver_status !== "delivered" ? (
+  <button
+    onClick={async () => {
+      await fetch("/api/orders", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          id: o.id,
+          deliver_status: "delivered",
+          delivered_at: new Date().toLocaleString("sv-SE", {
+  timeZone: "Asia/Kolkata"
+}).replace(" ", "T")
+        })
+      });
+
+      onRefresh();
+    }}
+    style={{
+      background:"#22c55e",
+      color:"#fff",
+      border:"none",
+      padding:"6px 12px",
+      borderRadius:8,
+      fontSize:12,
+      fontWeight:600,
+      cursor:"pointer"
+    }}
+  >
+    Delivered
+  </button>
+) : (
+  <div style={{
+    display:"flex",
+    flexDirection:"column",
+    alignItems:"flex-end"
+  }}>
+    <span style={{
+      fontSize:11,
+      color:"#22c55e",
+      fontWeight:600
+    }}>
+      ✓ Delivered
+    </span>
+
+    {o.delivered_at && (
+      <span style={{
+        fontSize:10,
+        color:"#64748b",
+        marginTop:2
+      }}>
+        {new Date(o.delivered_at).toLocaleString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit"
+        })}
+      </span>
+    )}
+  </div>
+)}
+
+</div>
+</div>
+</div>
           ))}
         </div>
       )}

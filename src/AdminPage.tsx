@@ -562,64 +562,65 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
       hour12: true
     })}
   </p>
-
 {o.deliver_status !== "delivered" ? (
-  <button
-    onClick={async () => {
-     await fetch(`${API}/api/orders`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          id: o.id,
-          deliver_status: "delivered",
-          delivered_at: new Date().toLocaleString("sv-SE", {
-  timeZone: "Asia/Kolkata"
-}).replace(" ", "T")
-        })
-      });
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
 
-      onRefresh();
-    }}
-    style={{
-      background:"#22c55e",
-      color:"#fff",
-      border:"none",
-      padding:"6px 12px",
-      borderRadius:8,
-      fontSize:12,
-      fontWeight:600,
-      cursor:"pointer"
-    }}
-  >
-    Delivered
-  </button>
+    {/* Pay Status */}
+    {o.pay_status !== "paid" ? (
+      <button
+        onClick={async () => {
+          await fetch(`${API}/api/orders`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: o.id, pay_status: "paid" })
+          });
+          onRefresh();
+        }}
+        style={{
+          background: "#E8762C", color: "#fff", border: "none",
+          padding: "5px 12px", borderRadius: 8, fontSize: 11,
+          fontWeight: 600, cursor: "pointer"
+        }}
+      >
+        💰 Mark Paid
+      </button>
+    ) : (
+      <span style={{ fontSize: 11, color: "#28A745", fontWeight: 600 }}>✓ Paid</span>
+    )}
+
+    {/* Deliver button — only enabled after paid */}
+    <button
+      disabled={o.pay_status !== "paid"}
+      onClick={async () => {
+        await fetch(`${API}/api/orders`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: o.id,
+            deliver_status: "delivered",
+          })
+        });
+        onRefresh();
+      }}
+      style={{
+        background: o.pay_status === "paid" ? "#22c55e" : "#C8BBAA",
+        color: "#fff", border: "none", padding: "6px 12px",
+        borderRadius: 8, fontSize: 12, fontWeight: 600,
+        cursor: o.pay_status === "paid" ? "pointer" : "not-allowed",
+        opacity: o.pay_status === "paid" ? 1 : 0.6
+      }}
+    >
+      🚀 Delivered
+    </button>
+
+  </div>
 ) : (
-  <div style={{
-    display:"flex",
-    flexDirection:"column",
-    alignItems:"flex-end"
-  }}>
-    <span style={{
-      fontSize:11,
-      color:"#22c55e",
-      fontWeight:600
-    }}>
-      ✓ Delivered
-    </span>
-
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+    <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>✓ Delivered</span>
     {o.delivered_at && (
-      <span style={{
-        fontSize:10,
-        color:"#64748b",
-        marginTop:2
-      }}>
+      <span style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
         {new Date(o.delivered_at).toLocaleString("en-IN", {
-          day: "2-digit",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit"
+          day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
         })}
       </span>
     )}

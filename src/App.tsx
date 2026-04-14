@@ -159,6 +159,7 @@ function App() {
         delivery_type: "delivery",
         payment_mode: paymentMode,
         total: cartTotal,
+        
       });
     } catch (err) {
       setCheckoutError("Could not save order to server. Please try again.");

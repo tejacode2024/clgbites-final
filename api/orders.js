@@ -68,3 +68,4 @@ if (req.method === 'PATCH') {
 
   return res.status(200).json(data)
 }
+}

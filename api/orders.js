@@ -33,11 +33,11 @@ export default async function handler(req, res) {
 
   // UPDATE DELIVERED
 if (req.method === 'PATCH') {
-  const { id, delivery_status } = req.body
+  const { id, deliver_status } = req.body
   const { data, error } = await supabase
     .from('orders')
     .update({
-      delivery_status,
+      deliver_status,
       delivered_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Kolkata" }).replace(" ", "T")
     })
     .eq('id', id)

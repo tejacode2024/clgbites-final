@@ -566,7 +566,7 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
 {o.deliver_status !== "delivered" ? (
   <button
     onClick={async () => {
-      await fetch("/api/orders", {
+     await fetch(`${API}/api/orders`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"

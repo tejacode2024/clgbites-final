@@ -32,18 +32,21 @@ export default async function handler(req, res) {
   }
 
   // UPDATE DELIVERED
-if (req.method === 'PATCH') {
-  const { id, deliver_status } = req.body
-  const { data, error } = await supabase
-    .from('orders')
-    .update({
-      deliver_status,
-      delivered_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Kolkata" }).replace(" ", "T")
-    })
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) return res.status(500).json({ error })
-  return res.status(200).json(data)
-}
+  if (req.method === 'PATCH') {
+    const { id, deliver_status } = req.body
+
+    const { data, error } = await supabase
+      .from('orders')
+      .update({
+        deliver_status,
+        delivered_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) return res.status(500).json({ error })
+
+    return res.status(200).json(data)
+  }
 }

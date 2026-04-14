@@ -489,7 +489,7 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
   
 }) {
   const [payMap, setPayMap] = useState({})
-const [tokenMap, setTokenMap] = useState({})
+// const [tokenMap, setTokenMap] = useState({})
   const [search, setSearch] = useState("");
   const filtered = orders.filter((o: any) =>
     o.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -594,51 +594,33 @@ const [tokenMap, setTokenMap] = useState({})
       Unpaid
     </label>
 
-    {/* TOKEN */}
-    <input
-      type="number"
-      placeholder="Token No"
-      value={tokenMap[o.id] || ""}
-      onChange={(e) =>
-        setTokenMap(prev => ({
-          ...prev,
-          [o.id]: Number(e.target.value)
-        }))
-      }
-      style={{ marginLeft: "10px" }}
-    />
+   
+    
 
     {/* BUTTON */}
     <button
-      onClick={async () => {
-        const pay = payMap[o.id]
-        const token = tokenMap[o.id]
+     onClick={async () => {
+  const pay = payMap[o.id]
 
-        if (!pay) {
-          alert("Select payment status")
-          return
-        }
+  if (!pay) {
+    alert("Select payment status")
+    return
+  }
 
-        if (!token) {
-          alert("Enter token number")
-          return
-        }
+  await fetch("/api/orders", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      id: o.id,
+      deliver_status: "delivered",
+      pay_status: pay
+    })
+  })
 
-        await fetch("/api/orders", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            id: o.id,
-            deliver_status: "delivered",
-            pay_status: pay,
-            token_number: token
-          })
-        })
-
-        onRefresh()
-      }}
+  onRefresh()
+}}
       style={{
         marginLeft: "10px",
         background: "#22c55e",

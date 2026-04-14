@@ -132,27 +132,43 @@ export default async function handler(req, res) {
 
   // ✅ UPDATE ORDER (DELIVER + PAYMENT + TOKEN)
   if (req.method === 'PATCH') {
-    const { id, deliver_status, pay_status, token_number } = req.body
+  const { id, deliver_status, pay_status } = req.body
 
-    const updateData = {
-      deliver_status,
-      delivered_at: new Date().toISOString()
-    }
+  // ✅ get today's start time (midnight)
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
 
-    if (pay_status !== undefined) updateData.pay_status = pay_status
-    if (token_number !== undefined) updateData.token_number = token_number
+  // ✅ fetch today's max token
+  const { data: todayOrders } = await supabase
+    .from('orders')
+    .select('token_number, created_at')
+    .gte('created_at', startOfDay.toISOString())
 
-    const { data, error } = await supabase
-      .from('orders')
-      .update(updateData)
-      .eq('id', id)
-      .select()
+  const maxToken = Math.max(
+    0,
+    ...(todayOrders?.map(o => o.token_number || 0) || [])
+  )
 
-    if (error) {
-      console.error(error)
-      return res.status(500).json({ error })
-    }
+  const nextToken = maxToken + 1
 
-    return res.status(200).json(data)
+  const updateData = {
+    deliver_status,
+    pay_status,
+    token_number: nextToken,
+    delivered_at: new Date().toISOString()
   }
+
+  const { data, error } = await supabase
+    .from('orders')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+
+  if (error) {
+    console.error(error)
+    return res.status(500).json({ error })
+  }
+
+  return res.status(200).json(data)
+}
 }

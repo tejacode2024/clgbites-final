@@ -563,56 +563,89 @@ function AdminOrders({ orders, loading, onRefresh, onExportAndClear, exporting }
     })}
   </p>
 {o.deliver_status !== "delivered" ? (
-  <button
-    onClick={async () => {
-      const choice = window.prompt(
-        `Order #${String(o.id).slice(-3)} — ${o.customer_name}\n\nEnter payment status:\n  1 = Paid & Delivered\n  2 = Unpaid & Delivered\n  3 = Not Delivered (cancel)`
-      );
+  <div>
 
-      if (!choice || choice.trim() === "3" || choice.trim() === "") return;
+    {/* ✅ RADIO BUTTON */}
+    <label>
+      <input
+        type="radio"
+        name={`pay-${o.id}`}
+        onChange={() =>
+          setPayMap(prev => ({ ...prev, [o.id]: "paid" }))
+        }
+      />
+      Paid
+    </label>
 
-      const pay_status = choice.trim() === "1" ? "paid" : "unpaid";
+    <label style={{ marginLeft: "10px" }}>
+      <input
+        type="radio"
+        name={`pay-${o.id}`}
+        onChange={() =>
+          setPayMap(prev => ({ ...prev, [o.id]: "unpaid" }))
+        }
+      />
+      Unpaid
+    </label>
 
-      await fetch(`${API}/api/orders`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: o.id,
-          deliver_status: "delivered",
-          pay_status,
-          delivered_at: new Date().toISOString()
+    {/* ✅ TOKEN INPUT */}
+    <input
+      type="number"
+      placeholder="Token No"
+      onChange={(e) =>
+        setTokenMap(prev => ({
+          ...prev,
+          [o.id]: Number(e.target.value)
+        }))
+      }
+      style={{ marginLeft: "10px" }}
+    />
+
+    {/* ✅ DELIVER BUTTON */}
+    <button
+      onClick={async () => {
+
+        const pay = payMap[o.id]
+        const token = tokenMap[o.id]
+
+        if (!pay) {
+          alert("Select payment status")
+          return
+        }
+
+        await fetch("/api/orders", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            id: o.id,
+            deliver_status: "delivered",
+            pay_status: pay,
+            token_number: token
+          })
         })
-      });
 
-      onRefresh();
-    }}
-    style={{
-      background: "#22c55e", color: "#fff", border: "none",
-      padding: "6px 12px", borderRadius: 8, fontSize: 12,
-      fontWeight: 600, cursor: "pointer"
-    }}
-  >
-    Delivered
-  </button>
+        onRefresh()
+      }}
+    >
+      Delivered
+    </button>
+
+  </div>
 ) : (
-  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-    <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>✓ Delivered</span>
-    <span style={{
-      fontSize: 11, fontWeight: 600, marginTop: 2,
-      color: o.pay_status === "paid" ? "#28A745" : "#E8882C"
-    }}>
-      {o.pay_status === "paid" ? "💰 Paid" : "⏳ Unpaid"}
+  <div style={{ textAlign: "right" }}>
+    <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>
+      ✓ Delivered
     </span>
+
     {o.delivered_at && (
-      <span style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>
-        {new Date(o.delivered_at).toLocaleString("en-IN", {
-          day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-        })}
-      </span>
+      <div style={{ fontSize: 10, color: "#64748b" }}>
+        {new Date(o.delivered_at).toLocaleString("en-IN")}
+      </div>
     )}
   </div>
 )}
-
 </div>
 </div>
 </div>

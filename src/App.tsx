@@ -69,9 +69,10 @@ const MENU_DATA = {
       { id: "t11", name: "Chicken Seekh Kebab",        price: 350, veg: false, img: "/images/chicken-tikka.webp" },
       { id: "t12", name: "Non Veg Tandoori Platter",   price: 450, veg: false, img: "/images/tandoori-chicken.webp" },
       { id: "t13", name: "Paneer Tikka",               price: 300, veg: true,  img: "/images/paneer-biryani.webp" },
-      { id: "t14", name: "Haraba Kabab",               price: 250, veg: true,  img: "/images/veg-biryani.webp" },
-      { id: "t15", name: "Veg Seekh Kebab",            price: 250, veg: true,  img: "/images/veg-biryani.webp" },
-      { id: "t16", name: "Veg Tandoori Platter",       price: 450, veg: true,  img: "/images/veg-biryani.webp" },
+      { id: "t14", name: "Haraba Kabab",               price: 250, veg: true,  img: "" },
+      { id: "t15", name: "Veg Seekh Kebab",            price: 250, veg: true,  img: "" },
+      { id: "t16", name: "Non-Veg Tandoori Platter",       price: 450, veg: false,  img: "" },
+      { id: "t16", name: "Veg Tandoori Platter",       price: 450, veg: true,  img: "" },
     ],
   },
 };

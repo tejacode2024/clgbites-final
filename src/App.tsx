@@ -156,10 +156,8 @@ function App() {
         customer_name: customerName,
         customer_phone: customerPhone,
         items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
-        delivery_type: "delivery",
         payment_mode: paymentMode,
         total: cartTotal,
-        
       });
     } catch (err) {
       setCheckoutError("Could not save order to server. Please try again.");
@@ -171,7 +169,7 @@ function App() {
     const lines   = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
     const confirm = paymentMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
     const msg = `🍛 *Order from CLGBITES × Nelakuditi*\n\n${lines}\n\n*Total: ₹${cartTotal}*\n\n👤 Name: ${customerName}\n📞 Phone: ${customerPhone}\n\n${confirm}`;
-    window.open(`https://wa.me/917396018423?text=${encodeURIComponent(msg)}`, "_blank");
+    window.open(`https://wa.me/919989955833?text=${encodeURIComponent(msg)}`, "_blank");
     setCheckoutStep("done");
   };
 
@@ -753,8 +751,8 @@ const AboutPage = memo(function AboutPage() {
         </div>
         <div className="about-contact">
           <h3>Contact Us</h3>
-          <a href="https://wa.me/917396018423" target="_blank" rel="noopener noreferrer" className="contact-wa">
-            WhatsApp: +91 7396018423
+          <a href="https://wa.me/919989955833" target="_blank" rel="noopener noreferrer" className="contact-wa">
+            WhatsApp: +91 9989955833
           </a>
         </div>
       </div>
@@ -821,7 +819,7 @@ const ContactSection = memo(function ContactSection() {
         <div className="contact-details">
           <div className="contact-row">
             <span className="contact-icon-wrap phone-icon">📞</span>
-            <a href="tel:+917396018423" className="contact-link">+91 73960 18423</a>
+            <a href="tel:+919989955833" className="contact-link">+91 73960 18423</a>
           </div>
           <div className="contact-row">
             <span className="contact-icon-wrap mail-icon">✉️</span>

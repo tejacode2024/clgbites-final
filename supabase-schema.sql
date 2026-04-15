@@ -4,17 +4,20 @@
 -- ══════════════════════════════════════════════════
 
 -- 1. ORDERS TABLE
+-- NEW
 create table if not exists orders (
-  id            bigint generated always as identity primary key,
-  customer_name text        not null,
-  customer_phone text       not null,
-  items         jsonb       not null,          -- [{id, name, price, qty}]
-  delivery_type text        not null default 'delivery',  -- 'delivery' | 'pickup'
-  payment_mode  text        not null default 'cod',       -- 'cod' | 'prepaid'
-  total         integer     not null,
-  created_at    timestamptz not null default now()
-);
+  id             bigint generated always as identity primary key,
+  customer_name  text        not null,
+  customer_phone text        not null,
+  items          jsonb       not null,          -- [{id, name, price, qty}]
 
+  payment_mode   text        not null default 'cod',      -- 'cod' | 'prepaid'
+  total          integer     not null,
+  pay_status     text        not null default 'pending',  -- 'paid' | 'unpaid' | 'pending'
+  pending_amount integer     default null,
+  deliver_status text        not null default 'pending',  -- 'pending' | 'delivered'
+  created_at     timestamptz not null default now()
+);
 -- Index for faster date-range queries on admin page
 create index if not exists orders_created_at_idx on orders(created_at desc);
 

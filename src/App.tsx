@@ -818,9 +818,9 @@ const MediaPartnerSection = memo(function MediaPartnerSection() {
         <div className="section-pill">📡 Media Partner</div>
         <h2 className="section-title">Stay in the Loop</h2>
       </div>
-      <div className="media-partner-container">
-        {/* Left sub-container: Profile */}
-        <div className="mp-profile">
+      <div className="mp-card">
+        {/* Left: Profile */}
+        <div className="mp-left">
           <div className="mp-avatar-wrap">
             <img src="/images/jilebi-logo.jpeg" alt="Jilebi Updates" className="mp-avatar" />
             <span className="mp-trending-badge">🔥 Trending</span>
@@ -833,21 +833,18 @@ const MediaPartnerSection = memo(function MediaPartnerSection() {
           </div>
         </div>
 
-        {/* Right sub-container: Info + Join */}
-        <div className="mp-info">
+        {/* Divider */}
+        <div className="mp-divider" />
+
+        {/* Right: Info + Join */}
+        <div className="mp-right">
           <p className="mp-desc">
-            Stay updated with <strong>SRM-AP events, exams & campus life</strong> — all in one WhatsApp channel.
+            Stay updated with <strong>SRM-AP events, exams &amp; campus life</strong> — all in one WhatsApp channel.
           </p>
-          <div className="mp-features">
-            <div className="mp-feature-chip">🔔 Exam Updates</div>
-            <div className="mp-feature-chip">🎉 Campus Events</div>
-            <div className="mp-feature-chip">📍 Nearby Spots</div>
-            <div className="mp-feature-chip">⚡ Instant Alerts</div>
-          </div>
           <div className="mp-social-proof">
             <div className="mp-avatars">
               {avatarLetters.map((l, i) => (
-                <div key={i} className="mp-mini-avatar" style={{ background: avatarColors[i], marginLeft: i === 0 ? 0 : -10 }}>
+                <div key={i} className="mp-mini-avatar" style={{ background: avatarColors[i], marginLeft: i === 0 ? 0 : -8 }}>
                   {l}
                 </div>
               ))}
@@ -857,19 +854,21 @@ const MediaPartnerSection = memo(function MediaPartnerSection() {
               <div className="mp-proof-sub">Trusted by SRM-AP community</div>
             </div>
           </div>
-          <div className="mp-meta">Free · No spam · SRM-AP only</div>
-          <a
-            href="https://whatsapp.com/channel/0029Va5vs6RFMqrfr1YnW31P"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mp-join-btn"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.533 5.859L.057 23.428a.5.5 0 00.614.614l5.569-1.476A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.9a9.9 9.9 0 01-5.031-1.373l-.36-.214-3.733.989.996-3.638-.235-.374A9.86 9.86 0 012.1 12C2.1 6.534 6.534 2.1 12 2.1S21.9 6.534 21.9 12 17.466 21.9 12 21.9z" />
-            </svg>
-            Join Now on WhatsApp
-          </a>
+          <div className="mp-bottom-row">
+            <span className="mp-meta">Free · No spam · SRM-AP only</span>
+            <a
+              href="https://whatsapp.com/channel/0029Va5vs6RFMqrfr1YnW31P"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mp-join-btn"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.533 5.859L.057 23.428a.5.5 0 00.614.614l5.569-1.476A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.9a9.9 9.9 0 01-5.031-1.373l-.36-.214-3.733.989.996-3.638-.235-.374A9.86 9.86 0 012.1 12C2.1 6.534 6.534 2.1 12 2.1S21.9 6.534 21.9 12 17.466 21.9 12 21.9z" />
+              </svg>
+              Join Now
+            </a>
+          </div>
         </div>
       </div>
     </section>

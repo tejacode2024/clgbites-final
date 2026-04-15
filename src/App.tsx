@@ -416,9 +416,16 @@ function WhatsAppBanner() {
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    // Check if user already dismissed this session
-    if (sessionStorage.getItem("wa_banner_dismissed")) return;
-    timerRef.current = setTimeout(() => setVisible(true), 1200);
+    const COOLDOWN_HOURS = 8; // show at most once every 8 hours
+    const DELAY_MS = 4000;    // wait 4 seconds after page load before popping up
+
+    const last = localStorage.getItem("wa_banner_last_shown");
+    if (last) {
+      const hoursSince = (Date.now() - parseInt(last, 10)) / (1000 * 60 * 60);
+      if (hoursSince < COOLDOWN_HOURS) return; // too soon, skip
+    }
+
+    timerRef.current = setTimeout(() => setVisible(true), DELAY_MS);
     return () => clearTimeout(timerRef.current);
   }, []);
 
@@ -427,7 +434,7 @@ function WhatsAppBanner() {
     setTimeout(() => {
       setVisible(false);
       setDismissed(true);
-      sessionStorage.setItem("wa_banner_dismissed", "1");
+      localStorage.setItem("wa_banner_last_shown", Date.now().toString());
     }, 320);
   };
 
@@ -519,6 +526,17 @@ function WhatsAppBanner() {
             position: "relative",
             borderBottom: "1px solid rgba(37,211,102,0.12)",
           }}>
+            {/* Sponsored label */}
+            <div style={{
+              position: "absolute", top: 12, left: 14,
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+              color: "rgba(255,255,255,0.28)",
+              textTransform: "uppercase",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 6, padding: "2px 7px",
+            }}>Sponsored</div>
+
             {/* Close button */}
             <button onClick={handleClose} style={{
               position: "absolute", top: 12, right: 12,

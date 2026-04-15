@@ -63,8 +63,8 @@ export default async function handler(req, res) {
     } else {
       const { error } = await supabase.from('orders').delete().neq('id', 0)
       if (error) return res.status(500).json({ error })
-      // Reset sequence so next order starts from token #1
-      await supabase.rpc('reset_orders_sequence')
+      // Reset the auto-increment sequence so next order gets id = 1
+      await supabase.rpc('reset_id_sequence')
     }
 
     return res.status(200).json({ ok: true })

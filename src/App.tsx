@@ -891,7 +891,7 @@ const ContactSection = memo(function ContactSection() {
         <div className="contact-details">
           <div className="contact-row">
             <span className="contact-icon-wrap phone-icon">📞</span>
-            <a href="tel:+919989955833" className="contact-link">+91 73960 18423</a>
+            <a href="tel:+919989955833" className="contact-link">+91 99899 55833</a>
           </div>
           <div className="contact-row">
             <span className="contact-icon-wrap mail-icon">✉️</span>

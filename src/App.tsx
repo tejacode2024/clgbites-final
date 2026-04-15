@@ -171,7 +171,7 @@ function App() {
     const tokenStr = tokenId ? `#${String(tokenId).padStart(3, "0")}` : "";
     const lines   = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
     const confirm = paymentMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
-    const msg = `*Order from SRM-AP*\n\n*Token: ${tokenStr}*\n\n${lines}\n\n*Total: ₹${cartTotal}*\n\n👤 Name: ${customerName}\n📞 Phone: ${customerPhone}\n\n${confirm}`;
+    const msg = `*Order from SRM-AP*\n\n*Token: ${tokenStr}*\n\n${lines}\n\n *Total: ₹${cartTotal}*\n\nName: ${customerName}\nPhone: ${customerPhone}\n\n${confirm}`;
     window.open(`https://wa.me/919989955833?text=${encodeURIComponent(msg)}`, "_blank");
      setCart([]);
     setCheckoutStep("done");

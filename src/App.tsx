@@ -37,7 +37,7 @@ const MENU_DATA = {
       { id: "b2", name: "Chicken Fry Piece Biryani", price: 219, veg: false, img: "/images/chicken-fry-biryani.webp" },
       { id: "b3", name: "Chicken Mixed Biryani",     price: 219, veg: false, img: "/images/chicken-dum-biryani.webp" },
       { id: "b4", name: "Chicken Mughali Biryani",   price: 249, veg: false, img: "/images/chicken-mughali-biryani.webp" },
-      { id: "b5", name: "Chicken Special Biryani",   price: 249, veg: false, img: "/images/chicken-special-biryani.webp" },
+      { id: "b5", name: "Chicken Special Biryani",   price: 279, veg: false, img: "/images/chicken-special-biryani.webp" },
       { id: "b6", name: "Veg Biryani",               price: 179, veg: true,  img: "/images/veg-biryani.webp" },
       { id: "b7", name: "Special Veg Biryani",       price: 189, veg: true,  img: "/images/veg-biryani.webp" },
       { id: "b8", name: "Paneer Biryani",             price: 229, veg: true,  img: "/images/paneer-biryani.webp" },
@@ -53,7 +53,7 @@ const MENU_DATA = {
     ],
   },
   tandoori: {
-    label: "Tandoori Specialties",
+    label: "Starters & Platters",
     emoji: "🔥",
     items: [
       { id: "t1",  name: "Tandoori Chicken Full",     price: 550, veg: false, img: "/images/tandoori-chicken.webp" },

@@ -1,62 +1,59 @@
 -- ══════════════════════════════════════════════════
 --  CLGBITES × Nelakuditi — Supabase Schema
---  Run this in Supabase → SQL Editor → New Query
 -- ══════════════════════════════════════════════════
 
 -- 1. ORDERS TABLE
--- NEW
 create table if not exists orders (
-  id             bigint generated always as identity primary key,
+  id             bigserial primary key,          -- id IS the token number
   customer_name  text        not null,
   customer_phone text        not null,
-  items          jsonb       not null,          -- [{id, name, price, qty}]
-
-  payment_mode   text        not null default 'cod',      -- 'cod' | 'prepaid'
+  items          jsonb       not null,
+  payment_mode   text        not null default 'cod',
   total          integer     not null,
-  pay_status     text        not null default 'pending',  -- 'paid' | 'unpaid' | 'pending'
+  pay_status     text        not null default 'pending',
   pending_amount integer     default null,
-  deliver_status text        not null default 'pending',  -- 'pending' | 'delivered'
+  deliver_status text        not null default 'pending',
   created_at     timestamptz not null default now()
 );
--- Index for faster date-range queries on admin page
+
 create index if not exists orders_created_at_idx on orders(created_at desc);
 
--- 2. CONFIG TABLE  (single-row, id=1 always)
+-- 2. CONFIG TABLE
 create table if not exists config (
   id            integer     primary key default 1,
   site_online   boolean     not null default true,
-  item_flags    jsonb       not null default '{}'::jsonb,  -- {itemId: bool}
+  item_flags    jsonb       not null default '{}'::jsonb,
   updated_at    timestamptz not null default now()
 );
 
--- Seed the one config row (safe to run multiple times)
 insert into config (id, site_online, item_flags)
 values (1, true, '{}')
 on conflict (id) do nothing;
 
--- 3. ROW-LEVEL SECURITY
---    orders: anyone can INSERT, only service_role can SELECT/DELETE
+-- 3. FUNCTION: reset sequence so next id starts from 1 after clearing all orders
+create or replace function reset_orders_sequence()
+returns void language plpgsql as $$
+begin
+  perform setval(pg_get_serial_sequence('orders', 'id'), 1, false);
+end;
+$$;
+
+-- 4. ROW-LEVEL SECURITY
 alter table orders enable row level security;
 
 create policy "Anyone can place an order"
-  on orders for insert
-  with check (true);
+  on orders for insert with check (true);
 
 create policy "Service role can read orders"
-  on orders for select
-  using (auth.role() = 'service_role');
+  on orders for select using (auth.role() = 'service_role');
 
 create policy "Service role can delete orders"
-  on orders for delete
-  using (auth.role() = 'service_role');
+  on orders for delete using (auth.role() = 'service_role');
 
---    config: anyone can read, only service_role can write
 alter table config enable row level security;
 
 create policy "Anyone can read config"
-  on config for select
-  using (true);
+  on config for select using (true);
 
 create policy "Service role can update config"
-  on config for update
-  using (auth.role() = 'service_role');
+  on config for update using (auth.role() = 'service_role');

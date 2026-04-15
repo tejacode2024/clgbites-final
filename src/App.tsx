@@ -151,28 +151,31 @@ function App() {
   const handleWhatsApp = async () => {
     setCheckoutError("");
     setCheckoutStep("saving");
+    let tokenId: number | undefined;
     try {
-      await saveOrder({
+      const result = await saveOrder({
         customer_name: customerName,
         customer_phone: customerPhone,
         items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
         payment_mode: paymentMode,
         total: cartTotal,
       });
+      // result from supabase insert is an array; grab the id of the new row
+      tokenId = Array.isArray(result) ? result[0]?.id : result?.orderId ?? result?.[0]?.id;
     } catch (err) {
       setCheckoutError("Could not save order to server. Please try again.");
       setCheckoutStep("checkout");
       return;
     }
 
-    // Order saved — open WhatsApp
+    const tokenStr = tokenId ? `#${String(tokenId).padStart(3, "0")}` : "";
     const lines   = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
     const confirm = paymentMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
-    const msg = `🍛 *Order from CLGBITES × Nelakuditi*\n\n${lines}\n\n*Total: ₹${cartTotal}*\n\n👤 Name: ${customerName}\n📞 Phone: ${customerPhone}\n\n${confirm}`;
+    const msg = `🍛 *Order from CLGBITES × Nelakuditi*\n\n🎫 *Token: ${tokenStr}*\n\n${lines}\n\n*Total: ₹${cartTotal}*\n\n👤 Name: ${customerName}\n📞 Phone: ${customerPhone}\n\n${confirm}`;
     window.open(`https://wa.me/919989955833?text=${encodeURIComponent(msg)}`, "_blank");
+     setCart([]);
     setCheckoutStep("done");
   };
-
   if (!splashDone) return <SplashScreen fading={splashFading} />;
 
   // Admin page takes over completely

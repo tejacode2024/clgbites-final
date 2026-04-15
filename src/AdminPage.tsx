@@ -187,20 +187,21 @@ function GlobalToast({ msg, onClose }: { msg: NewOrderInfo | null; onClose: () =
     <div style={{
       position: "fixed", top: 68, left: "50%", transform: "translateX(-50%)",
       zIndex: 9999, display: "flex", alignItems: "center", gap: 10,
-      background: C.brand, color: "#fff",
+      background: "#FFF3E6", color: C.brand,
       padding: "10px 16px 10px 14px", borderRadius: 99,
-      boxShadow: "0 4px 20px rgba(0,0,0,.22)",
+      boxShadow: "0 4px 20px rgba(232,118,44,.22)",
+      border: `1.5px solid ${C.orange}`,
       animation: "clg-slidein .3s ease", maxWidth: "85vw",
     }}>
       <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.orange, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Wifi size={13} color="#fff" />
       </div>
       <div>
-        <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,.6)", fontWeight: 500 }}>New order from</p>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#fff" }}>{msg.name}</p>
+        <p style={{ margin: 0, fontSize: 11, color: C.muted, fontWeight: 500 }}>New order from</p>
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: C.brand }}>{msg.name}</p>
       </div>
-      <button onClick={onClose} style={{ marginLeft: 4, background: "rgba(255,255,255,.15)", border: "none", borderRadius: 99, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-        <X size={11} color="#fff" />
+      <button onClick={onClose} style={{ marginLeft: 4, background: C.chip, border: `1px solid ${C.border}`, borderRadius: 99, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+        <X size={11} color={C.brand} />
       </button>
     </div>
   );
@@ -627,6 +628,15 @@ function AdminOrders({ apiOrders, loading, onRefresh, secret, onOrdersChanged }:
   const [busy, setBusy] = useState(false);
   // Clear only enabled after Export has been clicked at least once
   const [exported, setExported] = useState(false);
+   const prevOrderCount = useRef(0);
+
+  useEffect(() => {
+    // If new orders arrive after export, require re-export before clearing
+    if (apiOrders.length > prevOrderCount.current && exported) {
+      setExported(false);
+    }
+    prevOrderCount.current = apiOrders.length;
+  }, [apiOrders.length]);
 
  useEffect(() => {
     setOrders(prev => {
@@ -716,7 +726,7 @@ const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => 
       {upd && <UpdateModal order={upd} onSave={doUpd} onClose={() => setUpd(null)} />}
       {pay && <PayModal order={pay} onConfirm={doDlv} onClose={() => setPay(null)} />}
       {del && <DelConfirm order={del} onConfirm={doDel} onClose={() => setDel(null)} />}
-      {toast && <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 8, background: C.brand, color: "#fff", fontSize: 12, fontWeight: 500, padding: "8px 16px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,.2)", maxWidth: "85vw" }}><Wifi size={13} color={C.orange} style={{ flexShrink: 0 }} />{toast}</div>}
+    {toast && <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 8, background: "#FFF3E6", color: C.brand, fontSize: 12, fontWeight: 600, padding: "8px 16px", borderRadius: 99, boxShadow: "0 4px 16px rgba(232,118,44,.18)", border: `1px solid ${C.orange}`, maxWidth: "85vw" }}><Wifi size={13} color={C.orange} style={{ flexShrink: 0 }} />{toast}</div>}
       {/* toolbar */}
       <div style={{ display: "flex", gap: 8 }}>
         <div style={{ position: "relative", flex: 1 }}>
@@ -818,7 +828,7 @@ function AdminShowOff({ orders, secret, onOrdersChanged }: { orders: any[]; secr
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {toast && <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 8, background: C.brand, color: "#fff", fontSize: 12, fontWeight: 500, padding: "8px 16px", borderRadius: 99, boxShadow: "0 4px 16px rgba(0,0,0,.2)", maxWidth: "85vw" }}><Wifi size={13} color={C.orange} style={{ flexShrink: 0 }} />{toast}</div>}
+      {toast && <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 8, background: "#FFF3E6", color: C.brand, fontSize: 12, fontWeight: 600, padding: "8px 16px", borderRadius: 99, boxShadow: "0 4px 16px rgba(232,118,44,.18)", border: `1px solid ${C.orange}`, maxWidth: "85vw" }}><Wifi size={13} color={C.orange} style={{ flexShrink: 0 }} />{toast}</div>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={doWA} disabled={display.length === 0} style={{ ...btn("ghost"), flex: 1, padding: "13px 0", fontSize: 13, fontWeight: 700, background: "#25D366", color: "#fff", borderColor: "transparent", opacity: display.length === 0 ? .5 : 1 }}><MessageCircle size={16} />Share on WhatsApp</button>
         <button onClick={doExport} disabled={display.length === 0} style={{ ...btn("orange"), padding: "0 14px", fontSize: 12, opacity: display.length === 0 ? .5 : 1 }}><Download size={14} />Export</button>

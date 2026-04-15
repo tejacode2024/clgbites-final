@@ -33,11 +33,10 @@ export default async function handler(req, res) {
   const { id } = req.query
   if (!id) return res.status(400).json({ error: 'Missing id' })
 
-  const { items, total, status, deliver_status, pay_status, pending_amount } = req.body
+   const { items, total, deliver_status, pay_status, pending_amount } = req.body
   const update = {}
   if (items !== undefined) update.items = items
   if (total !== undefined) update.total = total
-  if (status !== undefined) update.status = status
   if (deliver_status !== undefined) {
   update.deliver_status = deliver_status
   if (deliver_status === 'delivered') update.delivered_at = new Date().toISOString()
@@ -64,6 +63,8 @@ export default async function handler(req, res) {
     } else {
       const { error } = await supabase.from('orders').delete().neq('id', 0)
       if (error) return res.status(500).json({ error })
+      // Reset sequence so next order starts from token #1
+      await supabase.rpc('reset_orders_sequence')
     }
 
     return res.status(200).json({ ok: true })

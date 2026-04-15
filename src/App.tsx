@@ -390,7 +390,6 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
 }) {
   return (
     <>
-      <WhatsAppBanner />
       <HeroBanner />
       <section className="section-label">
         <div className="section-pill">⭐ Chef's Picks</div>
@@ -417,7 +416,6 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
             Media Partner
           </span>
         </div>
-
         <div style={{
           background: "#fff",
           border: "1px solid #ffe0c2",
@@ -427,7 +425,6 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
           margin: "0 auto",
           boxShadow: "0 2px 12px rgba(180,83,9,0.07)",
         }}>
-          {/* Logo + name */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6 }}>
             <div style={{
               width: 40, height: 40, borderRadius: "50%",
@@ -441,8 +438,6 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
               <div style={{ fontSize: 11, color: "#b45309", fontWeight: 600 }}>Stay Ahead at SRM-AP</div>
             </div>
           </div>
-
-          {/* Follower pill */}
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             background: "#f0fdf4", border: "1px solid #bbf7d0",
@@ -452,13 +447,9 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
             12,000+ Followers
           </div>
-
-          {/* Description */}
           <p style={{ fontSize: 12.5, color: "#555", margin: "0 0 14px", lineHeight: 1.5 }}>
-            Stay updated with <strong>SRM-AP events, exams & campus life</strong> — all in one WhatsApp channel.
+            Stay updated with <strong>SRM-AP events, exams &amp; campus life</strong> — all in one WhatsApp channel.
           </p>
-
-          {/* Feature grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
             {[
               { emoji: "🔔", title: "Exam Updates",   desc: "Never miss a change" },
@@ -476,13 +467,9 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
               </div>
             ))}
           </div>
-
-          {/* Social proof */}
           <div style={{ fontSize: 11.5, color: "#555", marginBottom: 14 }}>
             <span style={{ fontWeight: 700, color: "#1a1a1a" }}>12K+ students</span> already joined · Trusted by SRM-AP community
           </div>
-
-          {/* CTA Button */}
           
             href="https://whatsapp.com/channel/0029VavHAxHFSAt7Hj3bCc1P"
             target="_blank"
@@ -497,7 +484,6 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
             <WaIcon />
             Join Now on WhatsApp
           </a>
-
           <div style={{ fontSize: 10, color: "#aaa", marginTop: 10 }}>
             Free · No spam · SRM-AP only
           </div>

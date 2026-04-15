@@ -859,7 +859,7 @@ const MediaPartnerSection = memo(function MediaPartnerSection() {
           </div>
           <div className="mp-meta">Free · No spam · SRM-AP only</div>
           
-            href="https://whatsapp.com/channel/https://whatsapp.com/channel/0029Va5vs6RFMqrfr1YnW31P"
+            href="https://whatsapp.com/channel/0029Va5vs6RFMqrfr1YnW31P"
             target="_blank"
             rel="noopener noreferrer"
             className="mp-join-btn"

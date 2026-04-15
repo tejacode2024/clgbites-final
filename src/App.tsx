@@ -374,313 +374,7 @@ function SplashScreen({ fading }: { fading: boolean }) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   WHATSAPP CHANNEL BANNER
-─────────────────────────────────────────────
-*/
-function CountUp({ end, duration = 1400 }: { end: number; duration?: number }) {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    let start: number | null = null;
-    const tick = (ts: number) => {
-      if (!start) start = ts;
-      const p = Math.min((ts - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - p, 4);
-      setCount(Math.floor(ease * end));
-      if (p < 1) requestAnimationFrame(tick);
-    };
-    const id = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(id);
-  }, [end, duration]);
-  return <>{count.toLocaleString()}</>;
-}
 
-const WA_FEATURES = [
-  { emoji: "🔔", title: "Exam Updates",   desc: "Never miss a change",     accent: "#facc15" },
-  { emoji: "🎉", title: "Campus Events",  desc: "Fests, flash mobs & fun",  accent: "#a78bfa" },
-  { emoji: "📍", title: "Nearby Spots",   desc: "PGs, food & essentials",   accent: "#fb923c" },
-  { emoji: "⚡", title: "Instant Alerts", desc: "Real-time campus news",    accent: "#4ade80" },
-];
-
-const WaIcon = () => (
-  <svg style={{ width: 18, height: 18, flexShrink: 0 }} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-  </svg>
-);
-
-function WhatsAppBanner() {
-  const [visible,   setVisible]   = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-  const [closing,   setClosing]   = useState(false);
-  const [btnDown,   setBtnDown]   = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    const COOLDOWN_HOURS = 8; // show at most once every 8 hours
-    const DELAY_MS = 4000;    // wait 4 seconds after page load before popping up
-
-    const last = localStorage.getItem("wa_banner_last_shown");
-    if (last) {
-      const hoursSince = (Date.now() - parseInt(last, 10)) / (1000 * 60 * 60);
-      if (hoursSince < COOLDOWN_HOURS) return; // too soon, skip
-    }
-
-    timerRef.current = setTimeout(() => setVisible(true), DELAY_MS);
-    return () => clearTimeout(timerRef.current);
-  }, []);
-
-  const handleClose = () => {
-    setClosing(true);
-    setTimeout(() => {
-      setVisible(false);
-      setDismissed(true);
-      localStorage.setItem("wa_banner_last_shown", Date.now().toString());
-    }, 320);
-  };
-
-  if (dismissed || !visible) return null;
-
-  return (
-    <>
-      <style>{`
-        @keyframes wa-overlay-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes wa-modal-in {
-          from { opacity: 0; transform: scale(0.92) translateY(24px); filter: blur(4px); }
-          to   { opacity: 1; transform: scale(1)    translateY(0);    filter: blur(0); }
-        }
-        @keyframes wa-modal-out {
-          from { opacity: 1; transform: scale(1)    translateY(0);    filter: blur(0); }
-          to   { opacity: 0; transform: scale(0.94) translateY(12px); filter: blur(2px); }
-        }
-        @keyframes wa-dot-pulse {
-          0%,100% { opacity: 1; box-shadow: 0 0 6px #4ade80; }
-          50%      { opacity: 0.55; box-shadow: 0 0 14px #4ade80; }
-        }
-        @keyframes wa-btn-glow {
-          0%,100% { box-shadow: 0 8px 28px rgba(37,211,102,0.45), 0 0 0 0 rgba(37,211,102,0.2); }
-          50%      { box-shadow: 0 8px 44px rgba(37,211,102,0.72), 0 0 0 6px rgba(37,211,102,0); }
-        }
-        @keyframes wa-shimmer {
-          0%   { background-position: -220% center; }
-          100% { background-position:  220% center; }
-        }
-        @keyframes wa-badge-pop {
-          0%   { transform: translateX(-50%) scale(0) rotate(-8deg); }
-          65%  { transform: translateX(-50%) scale(1.14) rotate(2deg); }
-          100% { transform: translateX(-50%) scale(1) rotate(0deg); }
-        }
-        .wa-overlay {
-          position: fixed; inset: 0; z-index: 9999;
-          background: rgba(0,0,0,0.72);
-          backdrop-filter: blur(6px);
-          display: flex; align-items: center; justify-content: center;
-          padding: 16px;
-          animation: wa-overlay-in 0.25s ease forwards;
-        }
-        .wa-modal {
-          width: 100%; max-width: 360px; max-height: 90vh; overflow-y: auto;
-          border-radius: 24px;
-          background: #0d1117;
-          border: 1px solid rgba(255,255,255,0.08);
-          box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(37,211,102,0.1);
-          animation: wa-modal-in 0.42s cubic-bezier(0.22,1,0.36,1) forwards;
-          font-family: 'Inter', system-ui, sans-serif;
-          scrollbar-width: none;
-        }
-        .wa-modal::-webkit-scrollbar { display: none; }
-        .wa-modal.closing { animation: wa-modal-out 0.30s ease-in forwards; }
-        .wa-shimmer-txt {
-          background: linear-gradient(92deg, #fbbf24 0%, #fde68a 35%, #f59e0b 50%, #fde68a 65%, #fbbf24 100%);
-          background-size: 220% auto;
-          -webkit-background-clip: text; background-clip: text;
-          -webkit-text-fill-color: transparent;
-          animation: wa-shimmer 2.8s linear infinite;
-        }
-        .wa-btn-idle { animation: wa-btn-glow 2.8s ease-in-out infinite; }
-        .wa-glow-dot {
-          display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-          background: #4ade80; flex-shrink: 0;
-          animation: wa-dot-pulse 2s ease-in-out infinite;
-        }
-        .wa-badge-pop {
-          animation: wa-badge-pop 0.45s cubic-bezier(0.34,1.56,0.64,1) 0.55s both;
-        }
-        .wa-feature-card {
-          border-radius: 14px; padding: 10px; cursor: default;
-          transition: transform 0.18s ease, box-shadow 0.18s ease;
-        }
-        .wa-feature-card:hover {
-          transform: translateY(-3px) scale(1.02);
-        }
-      `}</style>
-
-      <div className="wa-overlay" onClick={handleClose}>
-        <div className={`wa-modal${closing ? " closing" : ""}`} onClick={e => e.stopPropagation()}>
-
-          {/* ── Header strip ── */}
-          <div style={{
-            background: "linear-gradient(135deg, #0a1628 0%, #0d1f0d 50%, #0a1628 100%)",
-            borderRadius: "24px 24px 0 0",
-            padding: "28px 20px 24px",
-            textAlign: "center",
-            position: "relative",
-            borderBottom: "1px solid rgba(37,211,102,0.12)",
-          }}>
-            {/* Sponsored label */}
-            <div style={{
-              position: "absolute", top: 12, left: 14,
-              fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
-              color: "rgba(255,255,255,0.28)",
-              textTransform: "uppercase",
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 6, padding: "2px 7px",
-            }}>Sponsored</div>
-
-            {/* Close button */}
-            <button onClick={handleClose} style={{
-              position: "absolute", top: 12, right: 12,
-              width: 30, height: 30, borderRadius: "50%",
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: "rgba(255,255,255,0.6)",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 14, fontWeight: 700, transition: "all 0.15s",
-            }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.15)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.6)"; }}
-            >✕</button>
-
-            {/* Channel avatar */}
-            <div style={{ position: "relative", display: "inline-block", marginBottom: 14 }}>
-              <div style={{
-                width: 88, height: 88, borderRadius: "50%",
-                background: "linear-gradient(135deg, #25D366, #128C7E)",
-                padding: 3, margin: "0 auto",
-              }}>
-                <div style={{
-                  width: "100%", height: "100%", borderRadius: "50%",
-                  background: "#111", display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 36,
-                }}>📢</div>
-              </div>
-              {/* Trending badge */}
-              <div className="wa-badge-pop" style={{
-                position: "absolute", bottom: -6, left: "50%",
-                background: "linear-gradient(135deg,#f97316,#ef4444)",
-                borderRadius: 20, padding: "2px 8px",
-                fontSize: 10, fontWeight: 800, color: "#fff", whiteSpace: "nowrap",
-              }}>🔥 Trending</div>
-            </div>
-
-            {/* Title */}
-            <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 900, margin: "0 0 4px", letterSpacing: "-0.025em" }}>
-              Jilebi Updates
-            </h2>
-            <p className="wa-shimmer-txt" style={{ fontSize: 11, fontWeight: 700, margin: "0 0 12px", letterSpacing: "0.05em" }}>
-              Stay Ahead at SRM‑AP
-            </p>
-
-            {/* Live pill */}
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "4px 12px", borderRadius: 20,
-              background: "rgba(37,211,102,0.12)", border: "1px solid rgba(37,211,102,0.28)",
-            }}>
-              <span className="wa-glow-dot" />
-              <span style={{ color: "#4ade80", fontSize: 12, fontWeight: 700 }}>
-                <CountUp end={12000} />+ Followers
-              </span>
-            </div>
-          </div>
-
-          {/* ── Body ── */}
-          <div style={{ padding: "18px 18px 22px" }}>
-
-            {/* Copy */}
-            <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 12.5, lineHeight: 1.65, marginBottom: 16 }}>
-              Stay updated with{" "}
-              <span style={{ color: "#fff", fontWeight: 600 }}>SRM-AP events, exams & campus life</span>
-              {" "}— all in one WhatsApp channel.
-            </p>
-
-            {/* Feature grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-              {WA_FEATURES.map(f => (
-                <div key={f.title} className="wa-feature-card" style={{
-                  background: `${f.accent}12`,
-                  border: `1px solid ${f.accent}28`,
-                }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 10,
-                    background: `${f.accent}1a`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    marginBottom: 6, fontSize: 14,
-                  }}>{f.emoji}</div>
-                  <p style={{ color: "#fff", fontSize: 11, fontWeight: 700, margin: "0 0 2px", lineHeight: 1.3 }}>{f.title}</p>
-                  <p style={{ color: "rgba(255,255,255,0.38)", fontSize: 10, margin: 0, lineHeight: 1.3 }}>{f.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Social proof */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <div style={{ display: "flex", marginRight: 2 }}>
-                {["#ec4899","#3b82f6","#22c55e","#f97316","#8b5cf6"].map((bg, i) => (
-                  <div key={i} style={{
-                    width: 24, height: 24, borderRadius: "50%",
-                    background: bg, border: "2px solid #0d1117",
-                    marginLeft: i === 0 ? 0 : -8,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 9, fontWeight: 700, color: "#fff",
-                  }}>{"RSAPK"[i]}</div>
-                ))}
-              </div>
-              <div>
-                <p style={{ color: "#fff", fontSize: 11, fontWeight: 600, margin: "0 0 1px" }}>12K+ students already joined</p>
-                <p style={{ color: "rgba(255,255,255,0.32)", fontSize: 10, margin: 0 }}>Trusted by SRM-AP community</p>
-              </div>
-            </div>
-
-            {/* Urgency text */}
-            <p style={{ textAlign: "center", color: "rgba(255,255,255,0.38)", fontSize: 11, marginBottom: 10 }}>
-              Free · No spam · SRM-AP only
-            </p>
-
-            {/* CTA */}
-            <a
-              href="https://whatsapp.com/channel/0029Va5vs6RFMqrfr1YnW31P"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: "block", textDecoration: "none" }}
-            >
-              <button
-                className="wa-btn-idle"
-                style={{
-                  width: "100%", padding: "15px 0", borderRadius: 16,
-                  background: "linear-gradient(135deg, #25D366 0%, #20b05a 45%, #128C7E 100%)",
-                  border: "none", color: "#fff", fontWeight: 900, fontSize: 15,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                  cursor: "pointer", letterSpacing: "-0.01em",
-                  transform: btnDown ? "scale(0.97)" : "scale(1)",
-                  transition: "transform 0.1s ease, filter 0.1s ease",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.1)"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.03)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.filter = ""; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
-                onMouseDown={() => setBtnDown(true)}
-                onMouseUp={() => setBtnDown(false)}
-              >
-                <WaIcon />
-                Join Now on WhatsApp
-              </button>
-            </a>
-
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
 
 /* ─────────────────────────────────────────────
    HOME PAGE
@@ -710,6 +404,108 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
       <MenuSection categories={MENU_DATA} addItem={addItem} removeItem={removeItem} getQty={getQty}
         openCats={openCats} setOpenCats={setOpenCats} isItemEnabled={isItemEnabled} />
       <DailyReviewsSection />
+
+      {/* ── MEDIA PARTNER ── */}
+      <section style={{
+        background: "linear-gradient(135deg, #fff8f0 0%, #fff3e8 100%)",
+        borderTop: "1px solid #ffe0c2",
+        padding: "28px 20px 24px",
+        textAlign: "center" as const,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 14 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#b45309", textTransform: "uppercase" as const }}>
+            Media Partner
+          </span>
+        </div>
+
+        <div style={{
+          background: "#fff",
+          border: "1px solid #ffe0c2",
+          borderRadius: 16,
+          padding: "20px 18px",
+          maxWidth: 360,
+          margin: "0 auto",
+          boxShadow: "0 2px 12px rgba(180,83,9,0.07)",
+        }}>
+          {/* Logo + name */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: "50%",
+              background: "linear-gradient(135deg, #1a1a2e, #16213e)",
+              border: "2px solid #25d366",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 18,
+            }}>📢</div>
+            <div style={{ textAlign: "left" as const }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a1a" }}>Jilebi Updates</div>
+              <div style={{ fontSize: 11, color: "#b45309", fontWeight: 600 }}>Stay Ahead at SRM-AP</div>
+            </div>
+          </div>
+
+          {/* Follower pill */}
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            background: "#f0fdf4", border: "1px solid #bbf7d0",
+            borderRadius: 20, padding: "3px 12px", marginBottom: 14,
+            fontSize: 12, fontWeight: 700, color: "#15803d",
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+            12,000+ Followers
+          </div>
+
+          {/* Description */}
+          <p style={{ fontSize: 12.5, color: "#555", margin: "0 0 14px", lineHeight: 1.5 }}>
+            Stay updated with <strong>SRM-AP events, exams & campus life</strong> — all in one WhatsApp channel.
+          </p>
+
+          {/* Feature grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+            {[
+              { emoji: "🔔", title: "Exam Updates",   desc: "Never miss a change" },
+              { emoji: "🎉", title: "Campus Events",  desc: "Fests, flash mobs & fun" },
+              { emoji: "📍", title: "Nearby Spots",   desc: "PGs, food & essentials" },
+              { emoji: "⚡", title: "Instant Alerts", desc: "Real-time campus news" },
+            ].map(f => (
+              <div key={f.title} style={{
+                background: "#fff8f0", borderRadius: 10, padding: "10px 10px",
+                border: "1px solid #ffe0c2", textAlign: "left" as const,
+              }}>
+                <div style={{ fontSize: 16, marginBottom: 2 }}>{f.emoji}</div>
+                <div style={{ fontWeight: 700, fontSize: 11.5, color: "#1a1a1a" }}>{f.title}</div>
+                <div style={{ fontSize: 10.5, color: "#888", marginTop: 1 }}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Social proof */}
+          <div style={{ fontSize: 11.5, color: "#555", marginBottom: 14 }}>
+            <span style={{ fontWeight: 700, color: "#1a1a1a" }}>12K+ students</span> already joined · Trusted by SRM-AP community
+          </div>
+
+          {/* CTA Button */}
+          
+            href="https://whatsapp.com/channel/0029VavHAxHFSAt7Hj3bCc1P"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              background: "#25d366", color: "#fff", fontWeight: 700, fontSize: 14,
+              borderRadius: 12, padding: "11px 16px", textDecoration: "none",
+              boxShadow: "0 4px 14px rgba(37,211,102,0.3)",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+            Join Now on WhatsApp
+          </a>
+
+          <div style={{ fontSize: 10, color: "#aaa", marginTop: 10 }}>
+            Free · No spam · SRM-AP only
+          </div>
+        </div>
+      </section>
+
       <ContactSection />
     </>
   );

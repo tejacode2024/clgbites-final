@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     // ── Header row ─────────────────────────────────────────────────────────
    const headerRow = worksheet.addRow([
   'Token','Name','Phone','Item','Qty',
-  'Payment Mode','Payment Status','Pending Amount','Total','Deliver Status','Date & Time','Delivered At'
+  'Payment Mode','Total','Payment Status','Pending Amount','Deliver Status','Date & Time','Delivered At'
 ])
     headerRow.font      = { bold: true }
     headerRow.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF0E6' } }

@@ -374,8 +374,6 @@ function SplashScreen({ fading }: { fading: boolean }) {
   );
 }
 
-
-
 /* ─────────────────────────────────────────────
    HOME PAGE
 ───────────────────────────────────────────── */
@@ -403,93 +401,6 @@ function HomePage({ cart, addItem, removeItem, getQty, openCats, setOpenCats, is
       <MenuSection categories={MENU_DATA} addItem={addItem} removeItem={removeItem} getQty={getQty}
         openCats={openCats} setOpenCats={setOpenCats} isItemEnabled={isItemEnabled} />
       <DailyReviewsSection />
-
-      {/* ── MEDIA PARTNER ── */}
-      <section style={{
-        background: "linear-gradient(135deg, #fff8f0 0%, #fff3e8 100%)",
-        borderTop: "1px solid #ffe0c2",
-        padding: "28px 20px 24px",
-        textAlign: "center" as const,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 14 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#b45309", textTransform: "uppercase" as const }}>
-            Media Partner
-          </span>
-        </div>
-        <div style={{
-          background: "#fff",
-          border: "1px solid #ffe0c2",
-          borderRadius: 16,
-          padding: "20px 18px",
-          maxWidth: 360,
-          margin: "0 auto",
-          boxShadow: "0 2px 12px rgba(180,83,9,0.07)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: "50%",
-              background: "linear-gradient(135deg, #1a1a2e, #16213e)",
-              border: "2px solid #25d366",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18,
-            }}>📢</div>
-            <div style={{ textAlign: "left" as const }}>
-              <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a1a" }}>Jilebi Updates</div>
-              <div style={{ fontSize: 11, color: "#b45309", fontWeight: 600 }}>Stay Ahead at SRM-AP</div>
-            </div>
-          </div>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 5,
-            background: "#f0fdf4", border: "1px solid #bbf7d0",
-            borderRadius: 20, padding: "3px 12px", marginBottom: 14,
-            fontSize: 12, fontWeight: 700, color: "#15803d",
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
-            12,000+ Followers
-          </div>
-          <p style={{ fontSize: 12.5, color: "#555", margin: "0 0 14px", lineHeight: 1.5 }}>
-            Stay updated with <strong>SRM-AP events, exams &amp; campus life</strong> — all in one WhatsApp channel.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-            {[
-              { emoji: "🔔", title: "Exam Updates",   desc: "Never miss a change" },
-              { emoji: "🎉", title: "Campus Events",  desc: "Fests, flash mobs & fun" },
-              { emoji: "📍", title: "Nearby Spots",   desc: "PGs, food & essentials" },
-              { emoji: "⚡", title: "Instant Alerts", desc: "Real-time campus news" },
-            ].map(f => (
-              <div key={f.title} style={{
-                background: "#fff8f0", borderRadius: 10, padding: "10px 10px",
-                border: "1px solid #ffe0c2", textAlign: "left" as const,
-              }}>
-                <div style={{ fontSize: 16, marginBottom: 2 }}>{f.emoji}</div>
-                <div style={{ fontWeight: 700, fontSize: 11.5, color: "#1a1a1a" }}>{f.title}</div>
-                <div style={{ fontSize: 10.5, color: "#888", marginTop: 1 }}>{f.desc}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: 11.5, color: "#555", marginBottom: 14 }}>
-            <span style={{ fontWeight: 700, color: "#1a1a1a" }}>12K+ students</span> already joined · Trusted by SRM-AP community
-          </div>
-          
-            href="https://whatsapp.com/channel/0029VavHAxHFSAt7Hj3bCc1P"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              background: "#25d366", color: "#fff", fontWeight: 700, fontSize: 14,
-              borderRadius: 12, padding: "11px 16px", textDecoration: "none",
-              boxShadow: "0 4px 14px rgba(37,211,102,0.3)",
-            } as React.CSSProperties}
-          >
-            <WaIcon />
-            Join Now on WhatsApp
-          </a>
-          <div style={{ fontSize: 10, color: "#aaa", marginTop: 10 }}>
-            Free · No spam · SRM-AP only
-          </div>
-        </div>
-      </section>
-
       <ContactSection />
     </>
   );

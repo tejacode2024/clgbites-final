@@ -39,9 +39,9 @@ export default async function handler(req, res) {
     worksheet.addRow([]) // blank row
 
     // ── Header row ─────────────────────────────────────────────────────────
-    const headerRow = worksheet.addRow([
+   const headerRow = worksheet.addRow([
   'Token','Name','Phone','Item','Qty',
-  'Payment Mode','Payment Status','Pending Amount','Deliver Status','Date & Time','Delivered At'
+  'Payment Mode','Payment Status','Pending Amount','Total','Deliver Status','Date & Time','Delivered At'
 ])
     headerRow.font      = { bold: true }
     headerRow.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF0E6' } }
@@ -65,6 +65,7 @@ export default async function handler(req, res) {
           item.name,
           item.qty ?? 1,
           i === 0 ? payMode       : '',
+          i === 0 ? (order.total != null ? `₹${order.total}` : '') : '',
           i === 0 ? payStatus     : '',
           i === 0 ? pendingAmt    : '',
           i === 0 ? deliverStatus : '',
@@ -76,7 +77,9 @@ export default async function handler(req, res) {
       // If order had no items, still add one row
       if (items.length === 0) {
        worksheet.addRow([token, order.customer_name ?? '', order.customer_phone ?? '',
-          '—', 0, payMode, payStatus, pendingAmt, deliverStatus, time,
+          '—', 0, payMode, payStatus, pendingAmt,
+          order.total != null ? `₹${order.total}` : '',
+          deliverStatus, time,
           order.delivered_at ? fmtDT(order.delivered_at) : ''])
       }
     })
@@ -89,6 +92,7 @@ worksheet.columns = [
       { key:'item',    width: 32 },
       { key:'qty',     width: 6  },
       { key:'paymode', width: 14 },
+       { key:'total',   width: 12 },
       { key:'paysts',  width: 16 },
       { key:'pending', width: 16 },
       { key:'dlvsts',  width: 16 },

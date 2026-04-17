@@ -152,6 +152,23 @@ function App() {
   const handleWhatsApp = async () => {
     setCheckoutError("");
     setCheckoutStep("saving");
+
+    // Build a preliminary message without the token (token not yet known).
+    // We must call window.open() SYNCHRONOUSLY here — before any await —
+    // because iOS Safari's popup blocker kills any window.open() that is
+    // called after an async gap (it no longer considers it a direct user
+    // gesture). We open the window now, then update its location once we
+    // have the token from the server.
+    const lines   = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
+    const confirm = paymentMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
+
+    const buildMsg = (tokenStr: string) =>
+      `Order from SRM-AP\n\nToken: ${tokenStr}\n\nName: ${customerName}\n\nPhone: ${customerPhone}\n\n${lines}\n\n Total: ₹${cartTotal}\n\n${confirm}`;
+
+    // Open immediately (synchronous — satisfies iOS gesture requirement).
+    // Use "about:blank" as a placeholder; we'll redirect once the token arrives.
+    const waWindow = window.open("about:blank", "_blank");
+
     let tokenId: number | undefined;
     try {
       const result = await saveOrder({
@@ -166,15 +183,25 @@ function App() {
     } catch (err) {
       setCheckoutError("Could not save order to server. Please try again.");
       setCheckoutStep("checkout");
+      // Close the blank tab we opened if saving failed
+      if (waWindow) waWindow.close();
       return;
     }
 
     const tokenStr = tokenId ? `#${String(tokenId).padStart(3, "0")}` : "";
-    const lines   = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
-    const confirm = paymentMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
-    const msg = `Order from SRM-AP\n\nToken: ${tokenStr}\n\nName: ${customerName}\n\nPhone: ${customerPhone}\n\n${lines}\n\n Total: ₹${cartTotal}\n\n${confirm}`;
-    window.open(`https://wa.me/919989955833?text=${encodeURIComponent(msg)}`, "_blank");
-     setCart([]);
+    const waUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`;
+
+    // Now redirect the already-open window to the real WhatsApp URL.
+    // On iOS this works because the window handle was obtained synchronously.
+    if (waWindow) {
+      waWindow.location.href = waUrl;
+    } else {
+      // Fallback: waWindow can be null if the browser blocked it anyway
+      // (e.g. user has popups fully disabled). Use location redirect as last resort.
+      window.location.href = waUrl;
+    }
+
+    setCart([]);
     setCheckoutStep("done");
   };
   if (!splashDone) return <SplashScreen fading={splashFading} />;

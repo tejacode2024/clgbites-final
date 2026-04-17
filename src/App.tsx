@@ -99,6 +99,9 @@ function App() {
   const [openCats, setOpenCats]         = useState<Record<string, boolean>>({ biryani: true, pulaoRice: false, tandoori: false });
   const [checkoutStep, setCheckoutStep] = useState<"cart" | "checkout" | "saving" | "confirm" | "done">("cart");
   const [waUrl, setWaUrl] = useState<string>("");
+  const [confirmDetails, setConfirmDetails] = useState<{
+    cart: CartItem[]; name: string; phone: string; mode: "cod" | "prepaid"; total: number;
+  } | null>(null);
   const [paymentMode, setPaymentMode]   = useState<"cod" | "prepaid">("cod");
   const [customerName, setCustomerName]     = useState("");
   const [customerPhone, setCustomerPhone]   = useState("");
@@ -131,7 +134,7 @@ function App() {
         setSiteOnline(cfg.site_online);
         setItemFlags(cfg.item_flags ?? {});
       }).catch(() => {/* ignore transient errors */});
-    }, 5000);
+    }, 2000);
     return () => { clearTimeout(t1); clearTimeout(t2); clearInterval(poll); };
   }, []);
 
@@ -158,49 +161,47 @@ function App() {
   const cartTotal  = cart.reduce((s, c) => s + c.price * c.qty, 0);
   const cartCount  = cart.reduce((s, c) => s + c.qty, 0);
 
-  const handleWhatsApp = async () => {
+  const handleWhatsApp = () => {
     setCheckoutError("");
-    setCheckoutStep("saving");
 
-    const lines   = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
-    const confirm = paymentMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
+    // Build a stable snapshot of cart + customer details for the confirm screen.
+    const cartSnapshot = cart.map(c => ({ ...c }));
+    const nameSnap   = customerName;
+    const phoneSnap  = customerPhone;
+    const modeSnap   = paymentMode;
+    const totalSnap  = cartTotal;
 
+    const lines   = cartSnapshot.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
+    const confirmLine = modeSnap === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
+
+    // Build a temporary URL with a placeholder token — we'll update it once DB returns.
     const buildMsg = (tokenStr: string) =>
-      `Order from SRM-AP\n\nToken: ${tokenStr}\n\nName: ${customerName}\n\nPhone: ${customerPhone}\n\n${lines}\n\nTotal: ₹${cartTotal}\n\n${confirm}`;
+      `Order from SRM-AP\n\nToken: ${tokenStr}\n\nName: ${nameSnap}\n\nPhone: ${phoneSnap}\n\n${lines}\n\nTotal: ₹${totalSnap}\n\n${confirmLine}`;
 
-    // ── iOS & Android compatible WhatsApp redirect ────────────────────────
-    // window.open() after an `await` is blocked by iOS Safari's popup blocker.
-    // The only strategy that works on BOTH iOS and Android without any popup
-    // issues is: save the order first, then redirect the CURRENT TAB to wa.me.
-    // The user is already on the "Saving order…" spinner so leaving the page
-    // is expected. When they return (back button / app switch), the cart is
-    // cleared and the "Order Sent!" screen is shown.
-    // ─────────────────────────────────────────────────────────────────────
+    const placeholderUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg("#..."))}`;
+    setWaUrl(placeholderUrl);
 
-    let tokenId: number | undefined;
-    try {
-      const result = await saveOrder({
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
-        payment_mode: paymentMode,
-        total: cartTotal,
-      });
-      tokenId =
+    // Pass order summary snapshot to confirm screen immediately — zero lag.
+    setConfirmDetails({ cart: cartSnapshot, name: nameSnap, phone: phoneSnap, mode: modeSnap, total: totalSnap });
+    setCheckoutStep("confirm");
+
+    // Save to DB in the background — update waUrl with real token when done.
+    saveOrder({
+      customer_name: nameSnap,
+      customer_phone: phoneSnap,
+      items: cartSnapshot.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
+      payment_mode: modeSnap,
+      total: totalSnap,
+    }).then(result => {
+      const tokenId =
         result?.orderId ??
         result?.row?.token_number ??
         (Array.isArray(result) ? result[0]?.token_number ?? result[0]?.id : undefined);
-    } catch (err) {
-      setCheckoutError("Could not save order to server. Please try again.");
-      setCheckoutStep("checkout");
-      return;
-    }
-
-    // Order saved — show confirm step so user must explicitly send the WA message.
-    const tokenStr = tokenId != null ? `#${String(tokenId).padStart(3, "0")}` : "#???";
-    const builtUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`;
-    setWaUrl(builtUrl);
-    setCheckoutStep("confirm");
+      const tokenStr = tokenId != null ? `#${String(tokenId).padStart(3, "0")}` : "#???";
+      setWaUrl(`https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`);
+    }).catch(() => {
+      // Non-blocking — order still goes through WhatsApp even if DB fails
+    });
   };
   if (!splashDone) return <SplashScreen fading={splashFading} />;
 
@@ -280,7 +281,9 @@ function App() {
             ) : checkoutStep === "confirm" ? (
               <WhatsAppConfirmStep
                 waUrl={waUrl}
+                details={confirmDetails}
                 onDone={() => { setCart([]); setCheckoutStep("done"); }}
+                onAddMore={() => { setCheckoutStep("cart"); setCartOpen(false); }}
               />
             ) : checkoutStep === "checkout" ? (
               <CheckoutForm
@@ -688,45 +691,108 @@ function MenuSection({ categories, addItem, removeItem, getQty, openCats, setOpe
 /* ─────────────────────────────────────────────
    WHATSAPP CONFIRM STEP
 ───────────────────────────────────────────── */
-function WhatsAppConfirmStep({ waUrl, onDone }: { waUrl: string; onDone: () => void }) {
+const WA_ICON = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+    <path d="M12.004 0C5.374 0 0 5.373 0 12c0 2.117.554 4.1 1.522 5.822L.048 23.998l6.352-1.656A11.954 11.954 0 0012.004 24C18.628 24 24 18.627 24 12S18.628 0 12.004 0zm0 21.818a9.817 9.817 0 01-5.002-1.368l-.36-.214-3.72.97.999-3.645-.236-.375a9.817 9.817 0 01-1.499-5.186C2.186 6.58 6.591 2.18 12.004 2.18 17.41 2.18 21.814 6.58 21.814 12c0 5.41-4.404 9.818-9.81 9.818z"/>
+  </svg>
+);
+
+function WhatsAppConfirmStep({
+  waUrl, details, onDone, onAddMore
+}: {
+  waUrl: string;
+  details: { cart: CartItem[]; name: string; phone: string; mode: "cod" | "prepaid"; total: number; } | null;
+  onDone: () => void;
+  onAddMore: () => void;
+}) {
+  const sentRef = useRef(false);
+
+  // When user comes BACK to the tab after opening WhatsApp → show "Order Sent"
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && sentRef.current) {
+        onDone();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [onDone]);
+
   const handleOpen = () => {
-    // Immediately transition to "done" — when user comes back from WhatsApp, order is shown as sent.
-    onDone();
+    sentRef.current = true;
     window.open(waUrl, "_blank", "noopener,noreferrer");
+    // On iOS, visibilitychange fires when tab loses focus to WhatsApp.
+    // Set a fallback so returning to this tab triggers onDone reliably.
   };
 
   return (
     <div className="wa-confirm-step">
+
+      {/* ── Header ── */}
       <div className="wa-confirm-hero">
-        <div className="wa-confirm-icon">💬</div>
-        <h3>Almost there!</h3>
-        <p className="wa-confirm-tagline">Your order is saved. Just send the message on WhatsApp to finish.</p>
+        <div className="wa-confirm-icon">📋</div>
+        <h3>Review &amp; Send</h3>
+        <p className="wa-confirm-tagline">Verify your order before sending it on WhatsApp</p>
       </div>
 
+      {/* ── Order details card ── */}
+      {details && (
+        <div className="wa-order-card">
+          <div className="wa-order-meta">
+            <div className="wa-meta-row">
+              <span className="wa-meta-label">👤 Name</span>
+              <span className="wa-meta-val">{details.name}</span>
+            </div>
+            <div className="wa-meta-row">
+              <span className="wa-meta-label">📞 Phone</span>
+              <span className="wa-meta-val">{details.phone}</span>
+            </div>
+            <div className="wa-meta-row">
+              <span className="wa-meta-label">💳 Payment</span>
+              <span className="wa-meta-val">{details.mode === "cod" ? "💵 Cash on Delivery" : "📱 Prepaid (QR)"}</span>
+            </div>
+          </div>
+
+          <div className="wa-order-divider" />
+
+          <div className="wa-order-items">
+            {details.cart.map(c => (
+              <div key={c.id} className="wa-order-item">
+                <span className="wa-item-name">{c.name} <span className="wa-item-qty">×{c.qty}</span></span>
+                <span className="wa-item-price">₹{c.price * c.qty}</span>
+              </div>
+            ))}
+            <div className="wa-order-total">
+              <span>Total</span>
+              <span>₹{details.total}</span>
+            </div>
+          </div>
+
+          <button className="wa-add-more" onClick={onAddMore}>
+            + Add or remove items
+          </button>
+        </div>
+      )}
+
+      {/* ── WhatsApp send instruction ── */}
       <div className="wa-instruction-card">
-        <p className="wa-instruction-label">When WhatsApp opens:</p>
+        <p className="wa-instruction-label">How to send</p>
         <div className="wa-send-visual">
           <div className="wa-message-bubble">
-            <span className="wa-bubble-dots">Your order details...</span>
+            <span className="wa-bubble-text">Your order is pre-filled ✓</span>
           </div>
-          <div className="wa-send-arrow">
-            <div className="wa-send-btn-mock">▶</div>
-          </div>
+          <div className="wa-send-btn-mock">▶</div>
         </div>
-        <p className="wa-instruction-hint">Tap the green <strong>send button →</strong> to place your order</p>
+        <p className="wa-instruction-hint">Tap the green <strong>▶ Send</strong> button inside WhatsApp to place your order</p>
       </div>
 
+      {/* ── CTA ── */}
       <button className="btn-whatsapp wa-open-btn" onClick={handleOpen}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-          <path d="M12.004 0C5.374 0 0 5.373 0 12c0 2.117.554 4.1 1.522 5.822L.048 23.998l6.352-1.656A11.954 11.954 0 0012.004 24C18.628 24 24 18.627 24 12S18.628 0 12.004 0zm0 21.818a9.817 9.817 0 01-5.002-1.368l-.36-.214-3.72.97.999-3.645-.236-.375a9.817 9.817 0 01-1.499-5.186C2.186 6.58 6.591 2.18 12.004 2.18 17.41 2.18 21.814 6.58 21.814 12c0 5.41-4.404 9.818-9.81 9.818z"/>
-        </svg>
-        Open WhatsApp &amp; Send
+        {WA_ICON}
+        Send Order on WhatsApp
       </button>
 
-      <p className="wa-footer-note">
-        WhatsApp will open with your order message ready. Just hit <strong>Send</strong> — that's it! 🎉
-      </p>
     </div>
   );
 }

@@ -97,10 +97,16 @@ export default async function handler(req, res) {
       const { error } = await supabase.from('orders').delete().eq('token_number', id)
       if (error) return res.status(500).json({ error })
     } else {
-      // Clear all orders — token sequence is intentionally NOT reset so past
-      // tokens are never reused. Call reset_token_sequence() manually if needed.
+      // Clear all orders AND reset token sequence so the next order starts at #001
       const { error } = await supabase.from('orders').delete().neq('id', 0)
       if (error) return res.status(500).json({ error })
+
+      // Reset the token sequence back to 1 so the next order gets token #001
+      const { error: seqError } = await supabase.rpc('reset_token_sequence')
+      if (seqError) {
+        console.error('[orders DELETE] reset_token_sequence RPC failed:', seqError)
+        // Non-fatal — orders are cleared, only the sequence reset failed
+      }
     }
 
     return res.status(200).json({ ok: true })

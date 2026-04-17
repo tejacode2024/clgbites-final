@@ -73,8 +73,9 @@ async function exportXLSX(secret: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = `clgbites-orders-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
 }
 
 /* ─── Menu data ──────────────────────────────────────────────────────────── */
@@ -100,6 +101,31 @@ const MENU_DATA = {
   ]},
 };
 const MENU_SUGGESTIONS = Object.values(MENU_DATA).flatMap(c => c.items.map(i => i.name));
+
+/* ─── ExcelJS loader (UMD via CDN script tag — works in all browsers) ──── */
+let _excelJSPromise: Promise<any> | null = null;
+function loadExcelJS(): Promise<any> {
+  if (_excelJSPromise) return _excelJSPromise;
+  _excelJSPromise = new Promise((resolve, reject) => {
+    // Already loaded by a previous call
+    if ((window as any).ExcelJS) { resolve((window as any).ExcelJS); return; }
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+    s.onload = () => resolve((window as any).ExcelJS);
+    s.onerror = () => { _excelJSPromise = null; reject(new Error("Failed to load ExcelJS")); };
+    document.head.appendChild(s);
+  });
+  return _excelJSPromise;
+}
+/* Helper: trigger a browser download from an ArrayBuffer */
+function triggerDownload(buf: ArrayBuffer, filename: string, mime: string) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([buf], { type: mime }));
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 1000);
+}
 
 type AdminTab = "overview" | "menu-items" | "orders" | "showoff";
 
@@ -363,29 +389,28 @@ function AdminOverview({ siteOnline, setSiteOnline, patchConfig, saving, orders,
               onClick={async () => {
                 const now = new Date();
                 const ds = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-                const { default: ExcelJS } = await import("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" as any);
-                const wb = new ExcelJS.Workbook();
-                const ws = wb.addWorksheet("Stats");
-                ws.addRow([`CLGBITES - Stats | ${ds}`]);
-                ws.addRow([]);
-                const hdr = ws.addRow(["Metric", "Value"]);
-                hdr.font = { bold: true };
-                hdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF0E6" } };
-                hdr.alignment = { horizontal: "center" };
-                [
-                  ["Total Revenue", `₹${rev}`],
-                  ["Total Orders", orders.length],
-                  ["COD Revenue", `₹${codRev}`],
-                  ["Prepaid Revenue", `₹${preRev}`],
-                  ["Pending Orders", orders.filter((o: any) => o.deliver_status !== "delivered").length],
-                  ["Delivered Orders", orders.filter((o: any) => o.deliver_status === "delivered").length],
-                ].forEach(r => ws.addRow(r));
-                ws.columns = [{ width: 22 }, { width: 16 }];
-                const buf = await wb.xlsx.writeBuffer();
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-                a.download = `clgbites-stats-${now.toISOString().slice(0, 10)}.xlsx`;
-                a.click();
+                try {
+                  const ExcelJS = await loadExcelJS();
+                  const wb = new ExcelJS.Workbook();
+                  const ws = wb.addWorksheet("Stats");
+                  ws.addRow([`CLGBITES - Stats | ${ds}`]);
+                  ws.addRow([]);
+                  const hdr = ws.addRow(["Metric", "Value"]);
+                  hdr.font = { bold: true };
+                  hdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF0E6" } };
+                  hdr.alignment = { horizontal: "center" };
+                  [
+                    ["Total Revenue", `₹${rev}`],
+                    ["Total Orders", orders.length],
+                    ["COD Revenue", `₹${codRev}`],
+                    ["Prepaid Revenue", `₹${preRev}`],
+                    ["Pending Orders", orders.filter((o: any) => o.deliver_status !== "delivered").length],
+                    ["Delivered Orders", orders.filter((o: any) => o.deliver_status === "delivered").length],
+                  ].forEach(r => ws.addRow(r));
+                  ws.columns = [{ width: 22 }, { width: 16 }];
+                  const buf = await wb.xlsx.writeBuffer();
+                  triggerDownload(buf, `clgbites-stats-${now.toISOString().slice(0, 10)}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                } catch (e) { alert("Export failed. Please check your internet connection and try again."); }
               }}
               style={{ ...btn("ghost"), padding: "5px 10px", fontSize: 11, gap: 4 }}
             >
@@ -906,24 +931,25 @@ function AdminShowOff({ orders, secret, onOrdersChanged }: { orders: any[]; secr
   const doExport = async () => {
     const now = new Date();
     const ds = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    const { default: ExcelJS } = await import("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" as any);
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Show Off");
-    ws.addRow([`CLGBITES - Show Off | ${ds}`]);
-    ws.addRow([]);
-    const hdr = ws.addRow(["S.No", "Item Name", "Qty"]);
-    hdr.font = { bold: true };
-    hdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF0E6" } };
-    hdr.alignment = { horizontal: "center" };
-    display.forEach((it, i) => ws.addRow([i + 1, it.name, it.qty]));
-    ws.columns = [{ width: 8 }, { width: 36 }, { width: 8 }];
-    const buf = await wb.xlsx.writeBuffer();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    a.download = `clgbites-showoff-${now.toISOString().slice(0, 10)}.xlsx`;
-    a.click();
-    setExported(true);
-    setToast("Exported ✓");
+    try {
+      const ExcelJS = await loadExcelJS();
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Show Off");
+      ws.addRow([`CLGBITES - Show Off | ${ds}`]);
+      ws.addRow([]);
+      const hdr = ws.addRow(["S.No", "Item Name", "Qty"]);
+      hdr.font = { bold: true };
+      hdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF0E6" } };
+      hdr.alignment = { horizontal: "center" };
+      display.forEach((it, i) => ws.addRow([i + 1, it.name, it.qty]));
+      ws.columns = [{ width: 8 }, { width: 36 }, { width: 8 }];
+      const buf = await wb.xlsx.writeBuffer();
+      triggerDownload(buf, `clgbites-showoff-${now.toISOString().slice(0, 10)}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      setExported(true);
+      setToast("Exported ✓");
+    } catch (e) {
+      setToast("Export failed ✗");
+    }
   };
 
   /* Clear = UI list only; DB must already be empty; export must have been done */

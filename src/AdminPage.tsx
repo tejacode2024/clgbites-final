@@ -724,95 +724,146 @@ function OrderCard({ order, onUpd, onDel, onDlv }: { order: LocalOrder; onUpd: (
 
 /* ══════════════════════════════════════════════════════════════════════════
    TODAY'S ORDERS TAB
-   - Export: /api/export → real .xlsx
-   - Clear: only enabled after Export clicked at least once; clears DB
+   Self-contained: owns its own fetch + 8s poll. Never reads from parent
+   apiOrders prop for merge — parent prop is only used to detect new arrivals
+   for the global toast. This eliminates the race condition where the parent
+   poll overwrote optimistic "delivered" state.
+
+   Merge strategy on each poll:
+     - NEW order (token not seen before)  → add it
+     - EXISTING order, still pending in DB → keep local state (preserves
+       optimistic delivered updates that haven't synced yet)
+     - EXISTING order, delivered in DB     → mark delivered in local state
+       (handles the case where another device delivered it)
+   This means: once you click Deliver and DB confirms, it stays delivered
+   forever — no poll can revert it.
 ══════════════════════════════════════════════════════════════════════════ */
-function AdminOrders({ apiOrders, loading, onRefresh, secret, onOrdersChanged }: {
+function AdminOrders({ apiOrders, loading: parentLoading, onRefresh: parentRefresh, secret, onOrdersChanged }: {
   apiOrders: any[]; loading: boolean; onRefresh: () => void; secret: string; onOrdersChanged: () => void;
 }) {
-  // Initialise immediately from apiOrders — no artificial loading delay
-  const [orders, setOrders] = useState<LocalOrder[]>(() => apiOrders.map(apiToLocal));
-  const [search, setSearch] = useState("");
-  const [upd, setUpd] = useState<LocalOrder | null>(null);
-  const [pay, setPay] = useState<LocalOrder | null>(null);
-  const [del, setDel] = useState<LocalOrder | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  // Clear only enabled after Export has been clicked at least once
+  // Own state — not derived from apiOrders prop after mount
+  const [orders, setOrders]     = useState<LocalOrder[]>(() => apiOrders.map(apiToLocal));
+  const [fetching, setFetching] = useState(false);
+  const [search, setSearch]     = useState("");
+  const [upd, setUpd]           = useState<LocalOrder | null>(null);
+  const [pay, setPay]           = useState<LocalOrder | null>(null);
+  const [del, setDel]           = useState<LocalOrder | null>(null);
+  const [toast, setToast]       = useState<string | null>(null);
+  const [busy, setBusy]         = useState(false);
   const [exported, setExported] = useState(false);
-  const prevOrderCount = useRef(0);
 
-  useEffect(() => {
-    // If new orders arrive after export, require re-export before clearing
-    if (apiOrders.length > prevOrderCount.current && exported) {
-      setExported(false);
-    }
-    prevOrderCount.current = apiOrders.length;
-  }, [apiOrders.length]);
+  // Track which orders we have locally — key is token_number (our canonical id)
+  const localIds = useRef<Set<number | string>>(new Set(apiOrders.map(o => o.token_number ?? o.id)));
 
-  // Track which token_number IDs we have locally so we can merge new arrivals
-  const knownIds = useRef<Set<string | number>>(new Set(apiOrders.map(o => o.token_number ?? o.id)));
-
-  useEffect(() => {
-    // Only add genuinely NEW orders from polling — never touch existing local state.
-    // This prevents the poll from reverting optimistic "delivered" updates.
-    setOrders(prev => {
-      const prevTokens = new Set(prev.map(o => o.id));
-      const newOrders = apiOrders
-        .filter(o => {
-          const tok = o.token_number ?? o.id;
-          return !prevTokens.has(tok);
-        })
-        .map(apiToLocal);
-      if (newOrders.length === 0) return prev;
-      return [...prev, ...newOrders];
-    });
-  }, [apiOrders]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }, [toast]);
-
   const showToast = (m: string) => setToast(m);
 
- const doUpd = async (items: OrderItem[]) => {
-  if (!upd) return; setBusy(true);
-  // Recalculate total from MENU_DATA prices
-  const allMenuItems = Object.values(MENU_DATA).flatMap(c => c.items);
-  const newTotal = items.reduce((sum, item) => {
-    const menuItem = allMenuItems.find(m => m.name === item.name);
-    return sum + (menuItem ? menuItem.price * item.qty : 0);
-  }, 0) || upd.total; // fallback to old total if items not in menu
-  try {
-    await patchOrder(upd.id, { items, total: newTotal }, secret);
-    setOrders(p => p.map(o => o.id === upd.id ? { ...o, items, total: newTotal } : o));
-    showToast("Order updated ✓"); onOrdersChanged();
-  }
-  catch { showToast("Update failed ✗"); }
-  setBusy(false); setUpd(null);
-};
+  /* ── Smart merge: called after every fetch ──
+     - New orders are added
+     - Existing orders: if DB now says "delivered", update local state
+       (catches delivers from another device/browser)
+     - Existing orders: if DB still says "pending", keep local state
+       (preserves optimistic delivered state that hasn't propagated yet)
+  */
+  const mergeOrders = useCallback((fresh: any[]) => {
+    setOrders(prev => {
+      const prevMap = new Map(prev.map(o => [o.id, o]));
+      const merged: LocalOrder[] = [];
+      const seenIds = new Set<number | string>();
+
+      fresh.forEach(raw => {
+        const tok = raw.token_number ?? raw.id;
+        seenIds.add(tok);
+        const existing = prevMap.get(tok);
+        const freshLocal = apiToLocal(raw);
+
+        if (!existing) {
+          // Brand new order — add it
+          merged.push(freshLocal);
+          localIds.current.add(tok);
+        } else if (freshLocal.status === "delivered") {
+          // DB says delivered — always trust DB (another device may have delivered it)
+          merged.push({ ...existing, status: "delivered",
+            paymentStatus: freshLocal.paymentStatus,
+            pendingAmount: freshLocal.pendingAmount,
+            fadingOut: false });
+        } else {
+          // DB still shows pending — keep local state (may be optimistically delivered)
+          merged.push(existing);
+        }
+      });
+
+      // Keep any local orders not in fresh (shouldn't happen, but safety net)
+      prev.forEach(o => { if (!seenIds.has(o.id)) merged.push(o); });
+
+      // Sort by token number so order is stable
+      merged.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+      return merged;
+    });
+  }, []);
+
+  /* ── Own fetch function ── */
+  const loadOrders = useCallback(async () => {
+    setFetching(true);
+    try {
+      const fresh = await fetchOrders(secret);
+      mergeOrders(fresh);
+      // Also notify parent so Overview tab stays in sync
+      onOrdersChanged();
+    } catch { /* silent — keep showing existing orders */ }
+    setFetching(false);
+  }, [secret, mergeOrders, onOrdersChanged]);
+
+  /* ── Own 8s poll — faster than parent's 15s, independent of it ── */
+  useEffect(() => {
+    const id = setInterval(loadOrders, 8000);
+    return () => clearInterval(id);
+  }, [loadOrders]);
+
+  /* ── Actions ── */
+  const doUpd = async (items: OrderItem[]) => {
+    if (!upd) return; setBusy(true);
+    const allMenuItems = Object.values(MENU_DATA).flatMap(c => c.items);
+    const newTotal = items.reduce((sum, item) => {
+      const mi = allMenuItems.find(m => m.name === item.name);
+      return sum + (mi ? mi.price * item.qty : 0);
+    }, 0) || upd.total;
+    try {
+      await patchOrder(upd.id, { items, total: newTotal }, secret);
+      setOrders(p => p.map(o => o.id === upd.id ? { ...o, items, total: newTotal } : o));
+      showToast("Order updated ✓");
+    } catch { showToast("Update failed ✗"); }
+    setBusy(false); setUpd(null);
+  };
 
   const doDel = async () => {
     if (!del) return; setBusy(true);
-    try { await deleteOrder(del.id, secret); setOrders(p => p.filter(o => o.id !== del.id)); showToast("Order deleted ✓"); onOrdersChanged(); }
-    catch { showToast("Delete failed ✗"); }
+    try {
+      await deleteOrder(del.id, secret);
+      setOrders(p => p.filter(o => o.id !== del.id));
+      showToast("Order deleted ✓");
+    } catch { showToast("Delete failed ✗"); }
     setBusy(false); setDel(null);
   };
-const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => {
+
+  const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => {
     if (!pay) return;
-    const orderId = pay.id;  // this is token_number — matches what PATCH API expects
+    const orderId = pay.id;
     setBusy(true);
     setPay(null);
 
-    // Show fade animation immediately for responsiveness
+    // Immediate fade for responsiveness
     setOrders(p => p.map(o => o.id === orderId ? { ...o, fadingOut: true } : o));
 
     try {
-      // DB call first — if this fails we revert, no stale state issues
+      // DB first — single source of truth
       await patchOrder(orderId, {
         deliver_status: "delivered",
         pay_status: status,
         pending_amount: status === "pending" ? (amount ?? null) : null,
       }, secret);
 
-      // DB confirmed — now update local state permanently
+      // DB confirmed — permanently mark delivered in local state
       setOrders(p => p.map(o =>
         o.id === orderId
           ? { ...o, fadingOut: false, status: "delivered", paymentStatus: status, pendingAmount: amount }
@@ -820,14 +871,13 @@ const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => 
       ));
       showToast("Delivered ✓");
     } catch (err) {
-      // Revert fade on failure
       setOrders(p => p.map(o => o.id === orderId ? { ...o, fadingOut: false } : o));
       showToast("Deliver failed — check connection and retry ✗");
       console.error("patchOrder failed:", err);
     }
     setBusy(false);
   };
-  /* Export → /api/export → .xlsx; enables Clear button */
+
   const doExport = async () => {
     setBusy(true);
     try { await exportXLSX(secret); setExported(true); showToast("Exported ✓"); }
@@ -835,30 +885,33 @@ const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => 
     setBusy(false);
   };
 
-  /* Clear — only available after Export clicked; clears DB */
   const doClear = async () => {
     if (!exported) return;
     if (!window.confirm("Clear ALL orders from the database?\n\nToken numbers will restart from #001 on the next order.")) return;
     setBusy(true);
-    try { await clearAllOrders(secret); setOrders([]); setExported(false); showToast("All orders cleared ✓"); onOrdersChanged(); }
-    catch { showToast("Clear failed ✗"); }
+    try {
+      await clearAllOrders(secret);
+      setOrders([]);
+      localIds.current.clear();
+      setExported(false);
+      showToast("All orders cleared ✓");
+      onOrdersChanged();
+    } catch { showToast("Clear failed ✗"); }
     setBusy(false);
   };
 
+  const isLoading = fetching || parentLoading;
   const q = search.trim().toLowerCase();
   const match = (o: LocalOrder) => {
     if (!q) return true;
     if (o.name.toLowerCase().includes(q)) return true;
     if (o.phone.includes(q)) return true;
-    const tokenDigits = o.token.replace(/\D/g, "");
-    const qDigits = q.replace(/\D/g, "");
-    if (qDigits.length > 0) {
-      return tokenDigits === qDigits.padStart(tokenDigits.length, "0");
-    }
+    const td = o.token.replace(/\D/g, ""), qd = q.replace(/\D/g, "");
+    if (qd.length > 0) return td === qd.padStart(td.length, "0");
     return false;
   };
   const pending   = orders.filter(o => o?.status === "pending"   && match(o));
-  const delivered = orders.filter(o => o?.status === "delivered" && match(o)).sort((a, b) => tokenNum(a.token) - tokenNum(b.token));
+  const delivered = orders.filter(o => o?.status === "delivered" && match(o));
 
   const secLabel = (label: string, count: number, color: string, bg: string) => (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -873,29 +926,23 @@ const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => 
       {upd && <UpdateModal order={upd} onSave={doUpd} onClose={() => setUpd(null)} />}
       {pay && <PayModal order={pay} onConfirm={doDlv} onClose={() => setPay(null)} />}
       {del && <DelConfirm order={del} onConfirm={doDel} onClose={() => setDel(null)} />}
-    {toast && <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 8, background: "#FFF3E6", color: C.brand, fontSize: 12, fontWeight: 600, padding: "8px 16px", borderRadius: 99, boxShadow: "0 4px 16px rgba(232,118,44,.18)", border: `1px solid ${C.orange}`, maxWidth: "85vw" }}><Wifi size={13} color={C.orange} style={{ flexShrink: 0 }} />{toast}</div>}
-      {/* search — standalone full-width row for easy mobile use */}
+      {toast && <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 8, background: "#FFF3E6", color: C.brand, fontSize: 12, fontWeight: 600, padding: "8px 16px", borderRadius: 99, boxShadow: "0 4px 16px rgba(232,118,44,.18)", border: `1px solid ${C.orange}`, maxWidth: "85vw" }}><Wifi size={13} color={C.orange} style={{ flexShrink: 0 }} />{toast}</div>}
       <div style={{ position: "relative" }}>
         <Search size={15} color={C.muted} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
         <input type="text" placeholder="Search by name, phone or token…" value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, paddingLeft: 38 }} />
       </div>
-      {/* toolbar — action buttons row */}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={onRefresh} disabled={loading || busy} style={{ ...btn("ghost"), padding: "0 13px", fontSize: 15, opacity: loading ? .5 : 1 }}>{loading ? "…" : "↻"}</button>
+        <button onClick={loadOrders} disabled={isLoading || busy} style={{ ...btn("ghost"), padding: "0 13px", fontSize: 15, opacity: isLoading ? .5 : 1 }}>{isLoading ? "…" : "↻"}</button>
         <button onClick={doExport} disabled={busy || orders.length === 0} style={{ ...btn("orange"), flex: 1, padding: "0 13px", fontSize: 12, opacity: orders.length === 0 ? .5 : 1 }}><Download size={13} />Export</button>
-        <button
-          onClick={doClear}
-          disabled={!exported || busy || orders.length === 0}
+        <button onClick={doClear} disabled={!exported || busy || orders.length === 0}
           title={!exported ? "Export first to enable Clear" : "Clear all orders from DB"}
           style={{ ...btn(exported ? "red" : "ghost"), flex: 1, padding: "0 13px", fontSize: 12, opacity: exported && orders.length > 0 ? 1 : .4, cursor: exported && orders.length > 0 ? "pointer" : "not-allowed" }}
         ><Trash2 size={13} />Clear</button>
       </div>
-      {/* summary */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12 }}>
         <span style={{ color: C.muted }}><strong style={{ color: C.brand }}>{orders.length}</strong> orders · <span style={{ color: "#D97706" }}>{orders.filter(o => o.status === "pending").length}</span> pending · <span style={{ color: "#065F46" }}>{orders.filter(o => o.status === "delivered").length}</span> delivered</span>
         <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#065F46" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", animation: "clg-pulse 1.5s infinite", display: "inline-block" }} />Live</span>
       </div>
-      {/* pending */}
       {(pending.length > 0 || (!q && orders.filter(o => o.status === "pending").length === 0)) && (
         <div>
           {secLabel("Pending Orders", pending.length, "#D97706", "#FEF9C3")}
@@ -905,7 +952,6 @@ const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => 
           </div>
         </div>
       )}
-      {/* delivered */}
       {delivered.length > 0 && (
         <div>
           {secLabel("Delivered Orders", delivered.length, "#065F46", "#ECFDF5")}

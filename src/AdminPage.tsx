@@ -16,7 +16,7 @@ import {
   Lock, Eye, EyeOff, AlertCircle, TrendingUp, ShoppingBag, Clock,
   CheckCircle, Banknote, CreditCard, Search, Download, Trash2,
   CheckCircle2, Phone, Pencil, Plus, Minus, Wifi, FileSpreadsheet,
-  MessageCircle,
+  MessageCircle, BarChart2,
 } from "lucide-react";
 
 /* ─── ENV / API ──────────────────────────────────────────────────────────── */
@@ -79,16 +79,16 @@ async function exportXLSX(secret: string) {
 
 /* ─── Menu data ──────────────────────────────────────────────────────────── */
 const MENU_DATA = {
-  biryani: { label: "Biryani", emoji: "🍚", items: [
+  biryani: { label: "Biryani", icon: UtensilsCrossed, items: [
     { id: "b1", name: "Chicken Dum Biryani", price: 199 }, { id: "b2", name: "Chicken Fry Piece Biryani", price: 219 },
     { id: "b3", name: "Chicken Mixed Biryani", price: 219 }, { id: "b4", name: "Chicken Mughali Biryani", price: 249 },
     { id: "b5", name: "Chicken Special Biryani", price: 249 }, { id: "b6", name: "Veg Biryani", price: 179 },
     { id: "b7", name: "Special Veg Biryani", price: 189 }, { id: "b8", name: "Paneer Biryani", price: 229 },
   ]},
-  pulaoRice: { label: "Pulao & Fried Rice", emoji: "🍛", items: [
+  pulaoRice: { label: "Pulao & Fried Rice", icon: ShoppingBag, items: [
     { id: "p1", name: "Bagara Rice Chicken Fry", price: 219 }, { id: "p2", name: "Veg Fried Rice", price: 169 }, { id: "p3", name: "Sp Veg Fried Rice", price: 229 },
   ]},
-  tandoori: { label: "Tandoori Specialties", emoji: "🔥", items: [
+  tandoori: { label: "Tandoori Specialties", icon: TrendingUp, items: [
     { id: "t1", name: "Tandoori Chicken Full", price: 550 }, { id: "t2", name: "Tandoori Chicken Half", price: 300 },
     { id: "t3", name: "Tangdi Kabab (4 Pcs)", price: 390 }, { id: "t4", name: "Kalmi Kabab (4 Pcs)", price: 390 },
     { id: "t5", name: "Reshmi Kabab", price: 350 }, { id: "t6", name: "Chicken Tikka", price: 350 },
@@ -352,9 +352,34 @@ function AdminOverview({ siteOnline, setSiteOnline, patchConfig, saving, orders,
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <p style={labelCap}>Today's Stats</p>
-          <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#065F46" }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", animation: "clg-pulse 1.5s infinite", display: "inline-block" }} />Live
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#065F46" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", animation: "clg-pulse 1.5s infinite", display: "inline-block" }} />Live
+            </span>
+            <button
+              onClick={() => {
+                const ds = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                const lines = [
+                  [`CLGBITES — Stats Export | ${ds}`], [],
+                  ["Metric", "Value"],
+                  ["Total Revenue", `₹${rev}`],
+                  ["Total Orders", String(orders.length)],
+                  ["COD Revenue", `₹${codRev}`],
+                  ["Prepaid Revenue", `₹${preRev}`],
+                  ["Pending Orders", String(orders.filter((o: any) => o.deliver_status !== "delivered").length)],
+                  ["Delivered Orders", String(orders.filter((o: any) => o.deliver_status === "delivered").length)],
+                ];
+                const csv = "\uFEFF" + lines.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+                a.download = `clgbites-stats-${new Date().toISOString().slice(0,10)}.csv`;
+                a.click();
+              }}
+              style={{ ...btn("ghost"), padding: "5px 10px", fontSize: 11, gap: 4 }}
+            >
+              <BarChart2 size={12} />Export Stats
+            </button>
+          </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {stats.map(({ label, value, Icon, color, bg }) => (
@@ -420,7 +445,7 @@ function AdminMenuItems({ itemFlags, toggleItem }: { itemFlags: Record<string, b
       {filtered.map(cat => (
         <div key={cat.k} style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", background: C.stripe, borderBottom: `1px solid ${C.border}` }}>
-            <span style={{ fontSize: 16 }}>{cat.emoji}</span>
+            <cat.icon size={16} color={C.orange} />
             <span style={{ fontSize: 14, fontWeight: 700, color: C.brand }}>{cat.label}</span>
             <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 500, color: C.muted, background: C.border, padding: "2px 8px", borderRadius: 99 }}>{cat.items.length} items</span>
           </div>
@@ -572,38 +597,86 @@ function PayBadge({ s, a }: { s?: string; a?: number }) {
 
 function OrderCard({ order, onUpd, onDel, onDlv }: { order: LocalOrder; onUpd: () => void; onDel: () => void; onDlv: () => void; }) {
   const dlvd = order.status === "delivered";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
   return (
-    <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, boxShadow: "0 1px 4px rgba(0,0,0,.05)", overflow: "hidden", opacity: order.fadingOut ? .3 : dlvd ? .55 : 1, transform: order.fadingOut ? "scale(.97)" : "scale(1)", transition: "all .5s" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px 8px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {order.isNew && <span style={{ fontSize: 10, fontWeight: 800, background: C.orange, color: "#fff", padding: "2px 7px", borderRadius: 99, animation: "clg-pulse 1.5s infinite" }}>NEW</span>}
-          <span style={tagOrange}>{order.token}</span>
+    <div style={{ background: C.white, borderRadius: 18, border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(0,0,0,.07)", overflow: "visible", opacity: order.fadingOut ? .3 : dlvd ? .6 : 1, transform: order.fadingOut ? "scale(.97)" : "scale(1)", transition: "all .5s" }}>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {order.isNew && <span style={{ fontSize: 11, fontWeight: 800, background: C.orange, color: "#fff", padding: "3px 9px", borderRadius: 99, animation: "clg-pulse 1.5s infinite" }}>NEW</span>}
+          <span style={{ ...tagOrange, fontSize: 13, padding: "4px 10px" }}>{order.token}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={order.payment === "COD" ? tagCOD : tagPre}>{order.payment}</span>
           <PayBadge s={order.paymentStatus} a={order.pendingAmount} />
         </div>
       </div>
-      <div style={{ padding: "0 14px 8px" }}>
-        <p style={{ fontSize: 14, fontWeight: 700, color: C.brand, margin: 0 }}>{order.name}</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3, fontSize: 12, color: C.muted }}><Phone size={11} />{order.phone}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, fontSize: 11, color: C.mutedLt }}><Clock size={10} />{fmtDT(order.orderedAt)}</div>
+
+      {/* Customer info */}
+      <div style={{ padding: "0 16px 10px" }}>
+        <p style={{ fontSize: 16, fontWeight: 700, color: C.brand, margin: 0 }}>{order.name}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontSize: 13, color: C.muted }}>
+          <Phone size={12} />{order.phone}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, fontSize: 12, color: C.mutedLt }}>
+          <Clock size={11} />{fmtDT(order.orderedAt)}
+        </div>
       </div>
-      <div style={{ margin: "0 14px 10px", background: C.stripe, borderRadius: 10, padding: "8px 12px" }}>
+
+      {/* Items list */}
+      <div style={{ margin: "0 16px 12px", background: C.stripe, borderRadius: 12, padding: "10px 14px" }}>
         {order.items.map((item, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: i < order.items.length - 1 ? 4 : 0 }}>
-            <span style={{ fontSize: 12, color: C.brand }}>{item.name}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, marginLeft: 8 }}>×{item.qty}</span>
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: i < order.items.length - 1 ? 6 : 0 }}>
+            <span style={{ fontSize: 13, color: C.brand }}>{item.name}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginLeft: 8 }}>×{item.qty}</span>
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px 12px" }}>
-        <span style={{ fontSize: 16, fontWeight: 800, color: C.brand }}>{fmtMoney(order.total)}</span>
+
+      {/* Footer: total + actions */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 14px" }}>
+        <span style={{ fontSize: 18, fontWeight: 800, color: C.brand }}>{fmtMoney(order.total)}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={onUpd} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, border: `1px solid ${C.border}`, background: C.stripe, cursor: "pointer" }}><Pencil size={13} color={C.brand} /></button>
-          <button onClick={onDel} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "#FEF2F2", border: "1px solid #FECACA", cursor: "pointer" }}><Trash2 size={13} color="#EF4444" /></button>
-          <button onClick={() => !dlvd && onDlv()} disabled={dlvd} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 10, border: "none", fontSize: 12, fontWeight: 600, cursor: dlvd ? "default" : "pointer", background: dlvd ? "#ECFDF5" : C.orange, color: dlvd ? "#065F46" : "#fff" }}>
-            <CheckCircle2 size={13} />{dlvd ? "Delivered" : "Deliver"}
+
+          {/* Call button — links to customer phone directly */}
+          <a href={`tel:${order.phone}`} style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, background: "#ECFDF5", border: "1px solid #86EFAC", textDecoration: "none" }}>
+            <Phone size={16} color="#065F46" />
+          </a>
+
+          {/* ... menu (edit + delete) */}
+          <div ref={menuRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border: `1px solid ${C.border}`, background: C.stripe, cursor: "pointer", fontSize: 18, fontWeight: 700, color: C.brand, letterSpacing: 1 }}
+            >
+              ···
+            </button>
+            {menuOpen && (
+              <div style={{ position: "absolute", right: 0, bottom: 48, background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: "0 6px 24px rgba(0,0,0,.12)", zIndex: 30, minWidth: 150, overflow: "hidden" }}>
+                <button onClick={() => { setMenuOpen(false); onUpd(); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "13px 16px", border: "none", background: "transparent", fontSize: 14, fontWeight: 500, color: C.brand, cursor: "pointer", textAlign: "left" }}>
+                  <Pencil size={15} color={C.brand} />Edit Order
+                </button>
+                <div style={{ borderTop: `1px solid ${C.border}` }} />
+                <button onClick={() => { setMenuOpen(false); onDel(); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "13px 16px", border: "none", background: "transparent", fontSize: 14, fontWeight: 500, color: "#EF4444", cursor: "pointer", textAlign: "left" }}>
+                  <Trash2 size={15} color="#EF4444" />Delete
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Deliver button */}
+          <button onClick={() => !dlvd && onDlv()} disabled={dlvd} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 12, border: "none", fontSize: 13, fontWeight: 600, cursor: dlvd ? "default" : "pointer", background: dlvd ? "#ECFDF5" : C.orange, color: dlvd ? "#065F46" : "#fff" }}>
+            <CheckCircle2 size={15} />{dlvd ? "Delivered" : "Deliver"}
           </button>
         </div>
       </div>
@@ -709,7 +782,17 @@ const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => 
   };
 
   const q = search.trim().toLowerCase();
-  const match = (o: LocalOrder) => !q || o.name.toLowerCase().includes(q) || o.token.toLowerCase().includes(q) || o.phone.includes(q);
+  const match = (o: LocalOrder) => {
+    if (!q) return true;
+    if (o.name.toLowerCase().includes(q)) return true;
+    if (o.phone.includes(q)) return true;
+    const tokenDigits = o.token.replace(/\D/g, "");
+    const qDigits = q.replace(/\D/g, "");
+    if (qDigits.length > 0) {
+      return tokenDigits === qDigits.padStart(tokenDigits.length, "0");
+    }
+    return false;
+  };
   const pending   = orders.filter(o => o?.status === "pending"   && match(o));
   const delivered = orders.filter(o => o?.status === "delivered" && match(o)).sort((a, b) => tokenNum(a.token) - tokenNum(b.token));
 

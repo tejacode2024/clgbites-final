@@ -97,11 +97,15 @@ function App() {
   const [menuOpen, setMenuOpen]         = useState(false);
   const [cartOpen, setCartOpen]         = useState(false);
   const [openCats, setOpenCats]         = useState<Record<string, boolean>>({ biryani: true, pulaoRice: false, tandoori: false });
-  // Customer details — lifted so they persist across drawer open/close
-  const [custName,    setCustName]    = useState("");
-  const [custPhone,   setCustPhone]   = useState("");
-  const [custMode,    setCustMode]    = useState<"cod" | "prepaid">("cod");
-  const [custLocked,  setCustLocked]  = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<"cart" | "checkout" | "saving" | "confirm" | "done">("cart");
+  const [waUrl, setWaUrl] = useState<string>("");
+  const [confirmDetails, setConfirmDetails] = useState<{
+    cart: CartItem[]; name: string; phone: string; mode: "cod" | "prepaid"; total: number;
+  } | null>(null);
+  const [paymentMode, setPaymentMode]   = useState<"cod" | "prepaid">("cod");
+  const [customerName, setCustomerName]     = useState("");
+  const [customerPhone, setCustomerPhone]   = useState("");
+  const [checkoutError, setCheckoutError]   = useState("");
 
   // Config state
   const [siteOnline, setSiteOnline]   = useState(true);
@@ -157,7 +161,48 @@ function App() {
   const cartTotal  = cart.reduce((s, c) => s + c.price * c.qty, 0);
   const cartCount  = cart.reduce((s, c) => s + c.qty, 0);
 
+  const handleWhatsApp = () => {
+    setCheckoutError("");
 
+    // Build a stable snapshot of cart + customer details for the confirm screen.
+    const cartSnapshot = cart.map(c => ({ ...c }));
+    const nameSnap   = customerName;
+    const phoneSnap  = customerPhone;
+    const modeSnap   = paymentMode;
+    const totalSnap  = cartTotal;
+
+    const lines   = cartSnapshot.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
+    const confirmLine = modeSnap === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
+
+    // Build a temporary URL with a placeholder token — we'll update it once DB returns.
+    const buildMsg = (tokenStr: string) =>
+      `Order from SRM-AP\n\nToken: ${tokenStr}\n\nName: ${nameSnap}\n\nPhone: ${phoneSnap}\n\n${lines}\n\nTotal: ₹${totalSnap}\n\n${confirmLine}`;
+
+    const placeholderUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg("#..."))}`;
+    setWaUrl(placeholderUrl);
+
+    // Pass order summary snapshot to confirm screen immediately — zero lag.
+    setConfirmDetails({ cart: cartSnapshot, name: nameSnap, phone: phoneSnap, mode: modeSnap, total: totalSnap });
+    setCheckoutStep("confirm");
+
+    // Save to DB in the background — update waUrl with real token when done.
+    saveOrder({
+      customer_name: nameSnap,
+      customer_phone: phoneSnap,
+      items: cartSnapshot.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
+      payment_mode: modeSnap,
+      total: totalSnap,
+    }).then(result => {
+      const tokenId =
+        result?.orderId ??
+        result?.row?.token_number ??
+        (Array.isArray(result) ? result[0]?.token_number ?? result[0]?.id : undefined);
+      const tokenStr = tokenId != null ? `#${String(tokenId).padStart(3, "0")}` : "#???";
+      setWaUrl(`https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`);
+    }).catch(() => {
+      // Non-blocking — order still goes through WhatsApp even if DB fails
+    });
+  };
   if (!splashDone) return <SplashScreen fading={splashFading} />;
 
   // Admin page takes over completely
@@ -180,7 +225,7 @@ function App() {
         <div className="clg-brand" onClick={() => { setPage("home"); setCartOpen(false); }}>
           CLGBITES <span className="brand-x">×</span> Nelakuditi
         </div>
-        <button className="cart-btn" onClick={() => { setCartOpen(true); setMenuOpen(false); }}>
+        <button className="cart-btn" onClick={() => { setCartOpen(true); setMenuOpen(false); setCheckoutStep("cart"); }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
             <line x1="3" y1="6" x2="21" y2="6"/>
@@ -215,29 +260,99 @@ function App() {
           <div className="cart-panel" onClick={e => e.stopPropagation()}>
             <div className="cart-header">
               <h2>Your Order</h2>
-              <button onClick={() => setCartOpen(false)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
+              <button onClick={() => setCartOpen(false)}>✕</button>
             </div>
-            <OrderPanel
-              cart={cart}
-              cartTotal={cartTotal}
-              addItem={addItem}
-              removeItem={removeItem}
-              siteOnline={siteOnline}
-              custName={custName}      setCustName={setCustName}
-              custPhone={custPhone}    setCustPhone={setCustPhone}
-              custMode={custMode}      setCustMode={setCustMode}
-              custLocked={custLocked}  setCustLocked={setCustLocked}
-              onClose={() => setCartOpen(false)}
-              onBrowseMenu={() => {
-                setCartOpen(false);
-                setTimeout(() => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" }), 50);
-              }}
-              onOrderDone={() => { setCart([]); setCustName(""); setCustPhone(""); setCustMode("cod"); setCustLocked(false); setCartOpen(false); }}
-            />
+
+            {checkoutStep === "done" ? (
+              <div className="checkout-done">
+                <div className="done-icon">🎉</div>
+                <h3>Order Sent!</h3>
+                <p>Your order has been saved and sent via WhatsApp. We'll confirm it shortly!</p>
+                <button className="btn-primary" onClick={() => { setCartOpen(false); setCart([]); setCheckoutStep("cart"); }}>
+                  Back to Menu
+                </button>
+              </div>
+            ) : checkoutStep === "saving" ? (
+              <div className="checkout-done">
+                <div className="done-icon" style={{ fontSize: "2rem", animation: "spin 1s linear infinite" }}>⏳</div>
+                <h3>Saving order…</h3>
+                <p>Please wait a moment.</p>
+              </div>
+            ) : checkoutStep === "confirm" ? (
+              <WhatsAppConfirmStep
+                cart={cart}
+                cartTotal={cartTotal}
+                addItem={addItem}
+                removeItem={removeItem}
+                details={confirmDetails}
+                onDone={() => { setCart([]); setCheckoutStep("done"); }}
+                onAddMore={() => {
+                  setCartOpen(false);
+                  setCheckoutStep("cart");
+                  setTimeout(() => {
+                    document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
+                  }, 50);
+                }}
+              />
+            ) : checkoutStep === "checkout" ? (
+              <CheckoutForm
+                cart={cart}
+                cartTotal={cartTotal}
+                paymentMode={paymentMode}
+                setPaymentMode={setPaymentMode}
+                customerName={customerName}
+                setCustomerName={setCustomerName}
+                customerPhone={customerPhone}
+                setCustomerPhone={setCustomerPhone}
+                onConfirm={handleWhatsApp}
+                onBack={() => setCheckoutStep("cart")}
+                error={checkoutError}
+                disabled={!siteOnline}
+              />
+            ) : (
+              <>
+                {cart.length === 0 ? (
+                  <div className="cart-empty">
+                    <div className="empty-icon">🛒</div>
+                    <p>Your cart is empty</p>
+                    <span>Add items from our delicious menu!</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="cart-items">
+                      {cart.map(item => (
+                        <div key={item.id} className="cart-item-row">
+                          <img src={item.img} alt={item.name} className="cart-item-img" />
+                          <div className="cart-item-info">
+                            <div className="cart-item-name">{item.name}</div>
+                            <div className="cart-item-price">₹{item.price}</div>
+                          </div>
+                          <div className="qty-control">
+                            <button onClick={() => removeItem(item.id)}>−</button>
+                            <span>{item.qty}</span>
+                            <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price, img: item.img })}>+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="cart-footer">
+                      <div className="cart-totals">
+                        <div className="total-row"><span>Subtotal</span><span>₹{cartTotal}</span></div>
+                        <div className="total-row"><span>Delivery</span><span className="free">FREE</span></div>
+                        <div className="total-row total-final"><span>Total</span><span>₹{cartTotal}</span></div>
+                      </div>
+                      {!siteOnline ? (
+                        <div className="offline-cart-note">🔴 We're closed right now. Come back soon!</div>
+                      ) : (
+                        <button className="btn-primary" onClick={() => setCheckoutStep("checkout")}>
+                          Proceed to Checkout →
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -580,256 +695,248 @@ function MenuSection({ categories, addItem, removeItem, getQty, openCats, setOpe
 }
 
 /* ─────────────────────────────────────────────
-   SHARED SVG ICONS
+   WHATSAPP CONFIRM STEP
 ───────────────────────────────────────────── */
-const IcoUser    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
-const IcoPhone   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.71 3.35 2 2 0 0 1 3.68 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.64a16 16 0 0 0 6 6l1.06-1.06a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>;
-const IcoWallet  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
-const IcoEdit    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
-const IcoLock    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
-const IcoCheck   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
-const IcoPlus    = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-const IcoMinus   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-const IcoTrash   = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>;
-const IcoBag     = () => <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>;
-const IcoWA      = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12.004 0C5.374 0 0 5.373 0 12c0 2.117.554 4.1 1.522 5.822L.048 23.998l6.352-1.656A11.954 11.954 0 0012.004 24C18.628 24 24 18.627 24 12S18.628 0 12.004 0zm0 21.818a9.817 9.817 0 01-5.002-1.368l-.36-.214-3.72.97.999-3.645-.236-.375a9.817 9.817 0 01-1.499-5.186C2.186 6.58 6.591 2.18 12.004 2.18 17.41 2.18 21.814 6.58 21.814 12c0 5.41-4.404 9.818-9.81 9.818z"/></svg>;
-const IcoStar    = () => <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="var(--gold)"/></svg>;
+// Shared icon constants — match the site's warm, food-forward identity
+const IconUser = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+const IconPhone = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.71 3.35 2 2 0 0 1 3.68 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.64a16 16 0 0 0 6 6l1.06-1.06a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+  </svg>
+);
+const IconWallet = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+  </svg>
+);
+const IconEdit = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const IconPlus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IconMinus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IconWA = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+    <path d="M12.004 0C5.374 0 0 5.373 0 12c0 2.117.554 4.1 1.522 5.822L.048 23.998l6.352-1.656A11.954 11.954 0 0012.004 24C18.628 24 24 18.627 24 12S18.628 0 12.004 0zm0 21.818a9.817 9.817 0 01-5.002-1.368l-.36-.214-3.72.97.999-3.645-.236-.375a9.817 9.817 0 01-1.499-5.186C2.186 6.58 6.591 2.18 12.004 2.18 17.41 2.18 21.814 6.58 21.814 12c0 5.41-4.404 9.818-9.81 9.818z"/>
+  </svg>
+);
 
-/* ─────────────────────────────────────────────
-   ORDER PANEL  (single unified cart + checkout)
-───────────────────────────────────────────── */
-function OrderPanel({
-  cart, cartTotal, addItem, removeItem, siteOnline,
-  custName, setCustName, custPhone, setCustPhone,
-  custMode, setCustMode, custLocked, setCustLocked,
-  onClose, onBrowseMenu, onOrderDone,
+function WhatsAppConfirmStep({
+  cart, cartTotal, addItem, removeItem,
+  details, onDone, onAddMore,
 }: {
   cart: CartItem[];
   cartTotal: number;
   addItem: (item: { id: string; name: string; price: number; img: string }) => void;
   removeItem: (id: string) => void;
-  siteOnline: boolean;
-  custName: string;    setCustName:   (v: string) => void;
-  custPhone: string;   setCustPhone:  (v: string) => void;
-  custMode: "cod" | "prepaid"; setCustMode: (m: "cod" | "prepaid") => void;
-  custLocked: boolean; setCustLocked: (v: boolean) => void;
-  onClose: () => void;
-  onBrowseMenu: () => void;
-  onOrderDone: () => void;
+  details: { cart: CartItem[]; name: string; phone: string; mode: "cod" | "prepaid"; total: number; } | null;
+  onDone: () => void;
+  onAddMore: () => void;
 }) {
-  // Aliases for readability inside component
-  const name   = custName;   const setName   = setCustName;
-  const phone  = custPhone;  const setPhone  = setCustPhone;
-  const mode   = custMode;   const setMode   = setCustMode;
-  const locked = custLocked; const setLocked = setCustLocked;
-  const [sent,    setSent]    = useState(false);    // WA opened → waiting for return
-  const [done,    setDone]    = useState(false);    // user returned → order complete
-  const [sending, setSending] = useState(false);    // guard against double-tap
-  const [fieldErr, setFieldErr] = useState("");
+  const sentRef = useRef(false);
 
-  const detailsFilled = name.trim().length > 0 && phone.trim().length >= 10;
+  // Local editable state — starts from saved snapshot, stays in sync as user types
+  const [editName,  setEditName]  = useState(details?.name  ?? "");
+  const [editPhone, setEditPhone] = useState(details?.phone ?? "");
+  const [editMode,  setEditMode]  = useState<"cod" | "prepaid">(details?.mode ?? "cod");
 
-  // When tab becomes visible again after WA was opened → show done screen
+  // When user returns to tab after opening WhatsApp → show done screen
   useEffect(() => {
-    if (!sent) return;
     const onVisible = () => {
-      if (document.visibilityState === "visible") setDone(true);
+      if (document.visibilityState === "visible" && sentRef.current) onDone();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [sent]);
-
-  const handleLock = () => {
-    if (!name.trim())            { setFieldErr("Please enter your name."); return; }
-    if (phone.trim().length < 10){ setFieldErr("Enter a valid 10-digit mobile number."); return; }
-    setFieldErr("");
-    setLocked(true);
-  };
+  }, [onDone]);
 
   const handleSend = () => {
-    // Validate — should be locked already, but guard anyway
-    if (!name.trim() || phone.trim().length < 10 || cart.length === 0) return;
-    if (sending) return; // prevent double-tap
-    setSending(true);
+    sentRef.current = true;
 
     const lines       = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
-    const confirmLine = mode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
-    const msg         = `Order from SRM-AP\n\nName: ${name}\n\nPhone: ${phone}\n\n${lines}\n\nTotal: ₹${cartTotal}\n\n${confirmLine}`;
-    const waUrl       = `https://wa.me/919989955833?text=${encodeURIComponent(msg)}`;
+    const confirmLine = editMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
+    const buildMsg    = (tok: string) =>
+      `Order from SRM-AP\n\nToken: ${tok}\n\nName: ${editName}\n\nPhone: ${editPhone}\n\n${lines}\n\nTotal: ₹${cartTotal}\n\n${confirmLine}`;
 
-    // Open WhatsApp immediately — no wait
-    window.open(waUrl, "_blank", "noopener,noreferrer");
-    setSent(true);
+    const immediateUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg("#..."))}`;
+    window.open(immediateUrl, "_blank", "noopener,noreferrer");
 
-    // Save to DB in background — concurrent orders each get their own token server-side
-    // We do NOT await this — the order message in WA is the source of truth for the kitchen
+    // Fire-and-forget DB save with latest edits
     saveOrder({
-      customer_name: name,
-      customer_phone: phone,
+      customer_name: editName,
+      customer_phone: editPhone,
       items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
-      payment_mode: mode,
+      payment_mode: editMode,
       total: cartTotal,
-    }).catch(() => { /* non-blocking — WA message is the backup record */ });
+    }).catch(() => {/* non-blocking */});
   };
 
-  // ── DONE SCREEN ──────────────────────────────
-  if (done) {
-    return (
-      <div className="op-done">
-        <div className="op-done-icon"><IcoStar /></div>
-        <h3>Order Placed!</h3>
-        <p>Your order has been sent on WhatsApp.<br />We'll confirm it shortly.</p>
-        <button className="btn-primary" onClick={onOrderDone}>Start New Order</button>
-      </div>
-    );
-  }
+  const canSend = editName.trim().length > 0 && editPhone.trim().length > 0 && cart.length > 0;
 
-  // ── EMPTY CART ────────────────────────────────
-  if (cart.length === 0) {
-    return (
-      <div className="op-empty">
-        <div className="op-empty-icon"><IcoBag /></div>
-        <p>Your cart is empty</p>
-        <span>Add something delicious from the menu</span>
-        <button className="btn-primary" onClick={onBrowseMenu}>Browse Menu</button>
-      </div>
-    );
-  }
-
-  // ── MAIN PANEL ───────────────────────────────
   return (
-    <div className="op-panel">
+    <div className="wa-confirm-step">
 
-      {/* ─ ORDER ITEMS ─ */}
-      <div className="op-section">
-        <div className="op-section-head">
-          <span className="op-label">Your Order</span>
-          <button className="op-link" onClick={onBrowseMenu}>+ Add items</button>
+      {/* ── Section: Your Order ── */}
+      <div className="wac-section">
+        <div className="wac-section-head">
+          <span className="wac-section-title">Your Order</span>
+          <button className="wac-link" onClick={onAddMore}>Add items</button>
         </div>
 
-        <div className="op-items">
+        <div className="wac-items">
           {cart.map(item => (
-            <div key={item.id} className="op-item">
-              <img
-                src={item.img} alt={item.name} className="op-item-img"
-                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
-              <span className="op-item-name">{item.name}</span>
-              <div className="op-qty">
-                <button
-                  className="op-qty-btn"
-                  onClick={() => removeItem(item.id)}
-                  aria-label="Remove one"
-                >
-                  {item.qty === 1 ? <IcoTrash /> : <IcoMinus />}
-                </button>
+            <div key={item.id} className="wac-item">
+              <img src={item.img} alt={item.name} className="wac-item-img" onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
+              <span className="wac-item-name">{item.name}</span>
+              <div className="wac-qty">
+                <button onClick={() => removeItem(item.id)}><IconMinus /></button>
                 <span>{item.qty}</span>
-                <button
-                  className="op-qty-btn"
-                  onClick={() => addItem({ id: item.id, name: item.name, price: item.price, img: item.img })}
-                  aria-label="Add one"
-                >
-                  <IcoPlus />
-                </button>
+                <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price, img: item.img })}><IconPlus /></button>
               </div>
-              <span className="op-item-price">₹{item.price * item.qty}</span>
+              <span className="wac-item-price">₹{item.price * item.qty}</span>
             </div>
           ))}
         </div>
 
-        <div className="op-total">
+        <div className="wac-total">
           <span>Total</span>
           <span>₹{cartTotal}</span>
         </div>
       </div>
 
-      {/* ─ CUSTOMER DETAILS ─ */}
-      <div className="op-section">
-        <div className="op-section-head">
-          <span className="op-label">Your Details</span>
-          {locked
-            ? <button className="op-icon-btn" onClick={() => setLocked(false)} title="Edit details"><IcoEdit /></button>
-            : detailsFilled && <span className="op-hint-text">tap <IcoLock /> to lock before sending</span>
-          }
+      {/* ── Section: Details ── */}
+      <div className="wac-section">
+        <div className="wac-section-head">
+          <span className="wac-section-title">Your Details</span>
+          <span className="wac-edit-hint"><IconEdit /> tap to edit</span>
         </div>
 
-        {locked ? (
-          // ── Locked view — clean read-only display
-          <div className="op-locked-details">
-            <div className="op-locked-row">
-              <span className="op-locked-icon"><IcoUser /></span>
-              <span className="op-locked-val">{name}</span>
-            </div>
-            <div className="op-locked-row">
-              <span className="op-locked-icon"><IcoPhone /></span>
-              <span className="op-locked-val">{phone}</span>
-            </div>
-            <div className="op-locked-row">
-              <span className="op-locked-icon"><IcoWallet /></span>
-              <span className="op-locked-val">{mode === "cod" ? "Cash on Delivery" : "Prepaid (QR)"}</span>
-            </div>
-            <div className="op-locked-badge"><IcoCheck /> Details confirmed</div>
+        <div className="wac-fields">
+          <div className="wac-field">
+            <span className="wac-field-icon"><IconUser /></span>
+            <input
+              className="wac-field-input"
+              type="text"
+              placeholder="Your name"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+            />
           </div>
-        ) : (
-          // ── Editable form
-          <div className="op-fields">
-            <div className="op-field">
-              <span className="op-field-ico"><IcoUser /></span>
-              <input
-                className="op-field-input" type="text" placeholder="Your name"
-                value={name} onChange={e => { setName(e.target.value); setFieldErr(""); }}
-              />
-            </div>
-            <div className="op-field">
-              <span className="op-field-ico"><IcoPhone /></span>
-              <input
-                className="op-field-input" type="tel" placeholder="10-digit mobile"
-                value={phone} onChange={e => { setPhone(e.target.value); setFieldErr(""); }}
-                maxLength={10}
-              />
-            </div>
-            <div className="op-field op-field-pay">
-              <span className="op-field-ico"><IcoWallet /></span>
-              <label className={`op-pay-pill ${mode === "cod" ? "active" : ""}`}>
-                <input type="radio" name="op-mode" checked={mode === "cod"} onChange={() => setMode("cod")} />
-                Cash on Delivery
-              </label>
-              <label className={`op-pay-pill ${mode === "prepaid" ? "active" : ""}`}>
-                <input type="radio" name="op-mode" checked={mode === "prepaid"} onChange={() => setMode("prepaid")} />
-                Prepaid (QR)
-              </label>
-            </div>
-            {fieldErr && <p className="op-field-err">{fieldErr}</p>}
-            {detailsFilled && (
-              <button className="op-lock-btn" onClick={handleLock}>
-                <IcoLock /> Confirm Details
-              </button>
-            )}
+          <div className="wac-field">
+            <span className="wac-field-icon"><IconPhone /></span>
+            <input
+              className="wac-field-input"
+              type="tel"
+              placeholder="Mobile number"
+              value={editPhone}
+              onChange={e => setEditPhone(e.target.value)}
+            />
           </div>
-        )}
+          <div className="wac-field wac-field-payment">
+            <span className="wac-field-icon"><IconWallet /></span>
+            <label className={`wac-pay-opt ${editMode === "cod" ? "active" : ""}`}>
+              <input type="radio" name="wac-pay" checked={editMode === "cod"} onChange={() => setEditMode("cod")} />
+              Cash on Delivery
+            </label>
+            <label className={`wac-pay-opt ${editMode === "prepaid" ? "active" : ""}`}>
+              <input type="radio" name="wac-pay" checked={editMode === "prepaid"} onChange={() => setEditMode("prepaid")} />
+              Prepaid (QR)
+            </label>
+          </div>
+        </div>
       </div>
 
-      {/* ─ SEND CTA ─ */}
-      <div className="op-footer">
-        {!siteOnline ? (
-          <div className="op-offline">We're closed right now. Check back soon!</div>
-        ) : (
-          <>
-            <button
-              className="btn-whatsapp"
-              disabled={!locked || sending}
-              onClick={handleSend}
-            >
-              <IcoWA />
-              {sending ? "Opening WhatsApp…" : "Send Order on WhatsApp"}
-            </button>
-            <p className="op-send-hint">
-              WhatsApp opens with your order ready — just tap <span className="op-send-badge">Send ▶</span> to confirm.
-            </p>
-          </>
-        )}
+      {/* ── CTA ── */}
+      <div className="wac-cta">
+        <button className="btn-whatsapp" disabled={!canSend} onClick={handleSend}>
+          <IconWA />
+          Send Order on WhatsApp
+        </button>
+        <p className="wac-hint">
+          WhatsApp opens with your order. Just tap
+          <span className="wac-send-badge">Send ▶</span>
+          to confirm.
+        </p>
       </div>
 
+    </div>
+  );
+}
+
+function CheckoutForm({ cart, cartTotal, paymentMode, setPaymentMode, customerName, setCustomerName,
+  customerPhone, setCustomerPhone, onConfirm, onBack, error, disabled }: {
+  cart: CartItem[];
+  cartTotal: number;
+  paymentMode: "cod" | "prepaid";
+  setPaymentMode: (m: "cod" | "prepaid") => void;
+  customerName: string;
+  setCustomerName: (v: string) => void;
+  customerPhone: string;
+  setCustomerPhone: (v: string) => void;
+  onConfirm: () => void;
+  onBack: () => void;
+  error: string;
+  disabled: boolean;
+}) {
+  return (
+    <div className="checkout-form">
+      <h3>Checkout Details</h3>
+      <div className="order-summary">
+        {cart.map(c => (
+          <div key={c.id} className="summary-row">
+            <span>{c.name} × {c.qty}</span>
+            <span>₹{c.price * c.qty}</span>
+          </div>
+        ))}
+        <div className="summary-total"><span>Total</span><span>₹{cartTotal}</span></div>
+      </div>
+      <div className="form-group">
+        <label>Payment Mode</label>
+        <div className="payment-options">
+          <label className={`payment-opt ${paymentMode === "cod" ? "selected" : ""}`}>
+            <input type="radio" name="payment" checked={paymentMode === "cod"} onChange={() => setPaymentMode("cod")} />
+            💵 Cash on Delivery
+          </label>
+          <label className={`payment-opt ${paymentMode === "prepaid" ? "selected" : ""}`}>
+            <input type="radio" name="payment" checked={paymentMode === "prepaid"} onChange={() => setPaymentMode("prepaid")} />
+            📱 Prepaid (QR)
+          </label>
+        </div>
+      </div>
+      <div className="form-group">
+        <label>Your Name</label>
+        <input type="text" placeholder="Enter your name" value={customerName}
+          onChange={e => setCustomerName(e.target.value)} className="form-input" />
+      </div>
+      <div className="form-group">
+        <label>Mobile Number</label>
+        <input type="tel" placeholder="Enter mobile number" value={customerPhone}
+          onChange={e => setCustomerPhone(e.target.value)} className="form-input" />
+      </div>
+      {error && <div className="checkout-error">{error}</div>}
+      <button className="btn-whatsapp"
+        disabled={disabled || !customerName.trim() || !customerPhone.trim()}
+        onClick={onConfirm}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <path d="M12.004 0C5.374 0 0 5.373 0 12c0 2.117.554 4.1 1.522 5.822L.048 23.998l6.352-1.656A11.954 11.954 0 0012.004 24C18.628 24 24 18.627 24 12S18.628 0 12.004 0zm0 21.818a9.817 9.817 0 01-5.002-1.368l-.36-.214-3.72.97.999-3.645-.236-.375a9.817 9.817 0 01-1.499-5.186C2.186 6.58 6.591 2.18 12.004 2.18 17.41 2.18 21.814 6.58 21.814 12c0 5.41-4.404 9.818-9.81 9.818z"/>
+        </svg>
+        Confirm via WhatsApp
+      </button>
+      <button className="btn-back" onClick={onBack}>← Back to Cart</button>
     </div>
   );
 }
@@ -1022,7 +1129,7 @@ const ContactSection = memo(function ContactSection() {
 });
 
 /* ─────────────────────────────────────────────
-   REVIEWS PAG
+   REVIEWS PAGE
 ───────────────────────────────────────────── */
 const REVIEWS = [
   { name: "Rahul M.",   rating: 5, comment: "Best biryani near college! The dum biryani is absolutely divine. Will order again!", date: "2 days ago" },

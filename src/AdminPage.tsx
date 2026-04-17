@@ -357,22 +357,31 @@ function AdminOverview({ siteOnline, setSiteOnline, patchConfig, saving, orders,
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", animation: "clg-pulse 1.5s infinite", display: "inline-block" }} />Live
             </span>
             <button
-              onClick={() => {
-                const ds = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-                const lines = [
-                  [`CLGBITES — Stats Export | ${ds}`], [],
-                  ["Metric", "Value"],
+              onClick={async () => {
+                const now = new Date();
+                const ds = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                const { default: ExcelJS } = await import("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" as any);
+                const wb = new ExcelJS.Workbook();
+                const ws = wb.addWorksheet("Stats");
+                ws.addRow([`CLGBITES - Stats | ${ds}`]);
+                ws.addRow([]);
+                const hdr = ws.addRow(["Metric", "Value"]);
+                hdr.font = { bold: true };
+                hdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF0E6" } };
+                hdr.alignment = { horizontal: "center" };
+                [
                   ["Total Revenue", `₹${rev}`],
-                  ["Total Orders", String(orders.length)],
+                  ["Total Orders", orders.length],
                   ["COD Revenue", `₹${codRev}`],
                   ["Prepaid Revenue", `₹${preRev}`],
-                  ["Pending Orders", String(orders.filter((o: any) => o.deliver_status !== "delivered").length)],
-                  ["Delivered Orders", String(orders.filter((o: any) => o.deliver_status === "delivered").length)],
-                ];
-                const csv = "\uFEFF" + lines.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+                  ["Pending Orders", orders.filter((o: any) => o.deliver_status !== "delivered").length],
+                  ["Delivered Orders", orders.filter((o: any) => o.deliver_status === "delivered").length],
+                ].forEach(r => ws.addRow(r));
+                ws.columns = [{ width: 22 }, { width: 16 }];
+                const buf = await wb.xlsx.writeBuffer();
                 const a = document.createElement("a");
-                a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-                a.download = `clgbites-stats-${new Date().toISOString().slice(0,10)}.csv`;
+                a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+                a.download = `clgbites-stats-${now.toISOString().slice(0, 10)}.xlsx`;
                 a.click();
               }}
               style={{ ...btn("ghost"), padding: "5px 10px", fontSize: 11, gap: 4 }}
@@ -890,13 +899,25 @@ function AdminShowOff({ orders, secret, onOrdersChanged }: { orders: any[]; secr
     window.open(`https://wa.me/?text=${encodeURIComponent(`🍛 *CLGBITES — Today's Bestsellers*\n\n${lines}\n\nTotal: ${total}`)}`, "_blank");
   };
 
-  const doExport = () => {
+  const doExport = async () => {
     const now = new Date();
     const ds = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    const rows: string[][] = [[`CLGBITES - Show Off | ${ds}`], [], ["S.No", "Item Name", "Qty"], ...display.map((it, i) => [String(i + 1), it.name, String(it.qty)])];
-    const csv = "\uFEFF" + rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    a.download = `clgbites-showoff-${now.toISOString().slice(0, 10)}.csv`; a.click();
+    const { default: ExcelJS } = await import("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" as any);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Show Off");
+    ws.addRow([`CLGBITES - Show Off | ${ds}`]);
+    ws.addRow([]);
+    const hdr = ws.addRow(["S.No", "Item Name", "Qty"]);
+    hdr.font = { bold: true };
+    hdr.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF0E6" } };
+    hdr.alignment = { horizontal: "center" };
+    display.forEach((it, i) => ws.addRow([i + 1, it.name, it.qty]));
+    ws.columns = [{ width: 8 }, { width: 36 }, { width: 8 }];
+    const buf = await wb.xlsx.writeBuffer();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    a.download = `clgbites-showoff-${now.toISOString().slice(0, 10)}.xlsx`;
+    a.click();
     setExported(true);
     setToast("Exported ✓");
   };

@@ -479,6 +479,78 @@ function App() {
   );
 }
 
+/* ─────────────────────────────────────────────
+   CART DRAWER — floating bottom sheet
+   • Locks background scroll while open
+   • Swipe down to dismiss
+   • Page visible behind it (88vh height)
+───────────────────────────────────────────── */
+function CartDrawer({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  const startY   = useRef(0);
+  const currentY = useRef(0);
+  const dragging = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Lock body scroll while open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    startY.current   = e.touches[0].clientY;
+    currentY.current = 0;
+    dragging.current = true;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!dragging.current || !panelRef.current) return;
+    const dy = e.touches[0].clientY - startY.current;
+    if (dy < 0) return; // no upward drag
+    currentY.current = dy;
+    panelRef.current.style.transform  = `translateY(${dy}px)`;
+    panelRef.current.style.transition = "none";
+  };
+
+  const onTouchEnd = () => {
+    dragging.current = false;
+    if (!panelRef.current) return;
+    if (currentY.current > 120) {
+      panelRef.current.style.transition = "transform .3s cubic-bezier(.4,0,.2,1)";
+      panelRef.current.style.transform  = "translateY(100%)";
+      setTimeout(onClose, 300);
+    } else {
+      panelRef.current.style.transition = "transform .25s cubic-bezier(.16,1,.3,1)";
+      panelRef.current.style.transform  = "translateY(0)";
+    }
+  };
+
+  return (
+    <div className="cart-overlay" onClick={onClose}>
+      <div
+        ref={panelRef}
+        className="cart-panel"
+        onClick={e => e.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <div className="cart-drag-handle" />
+        <div className="cart-header">
+          <h2>Your Order</h2>
+          <button className="cart-close-btn" onClick={onClose}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /* ── SPLASH ── */
 function SplashScreen({ fading }: { fading: boolean }) {
   return (

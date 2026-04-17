@@ -1022,7 +1022,7 @@ const ContactSection = memo(function ContactSection() {
 });
 
 /* ─────────────────────────────────────────────
-   REVIEWS PAGE
+   REVIEWS PAG
 ───────────────────────────────────────────── */
 const REVIEWS = [
   { name: "Rahul M.",   rating: 5, comment: "Best biryani near college! The dum biryani is absolutely divine. Will order again!", date: "2 days ago" },

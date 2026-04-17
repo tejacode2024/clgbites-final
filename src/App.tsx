@@ -157,62 +157,16 @@ function App() {
     const confirm = paymentMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
 
     const buildMsg = (tokenStr: string) =>
-      `Order from SRM-AP\n\nToken: ${tokenStr}\n\nName: ${customerName}\n\nPhone: ${customerPhone}\n\n${lines}\n\n Total: ₹${cartTotal}\n\n${confirm}`;
+      `Order from SRM-AP\n\nToken: ${tokenStr}\n\nName: ${customerName}\n\nPhone: ${customerPhone}\n\n${lines}\n\nTotal: ₹${cartTotal}\n\n${confirm}`;
 
-    // ── iOS / Android WhatsApp redirect strategy ──────────────────────────
-    // iOS Safari blocks window.open() called after any `await`, AND also
-    // blocks navigating an about:blank popup to an external deep-link (wa.me).
-    // Android Chrome allows window.open() after async but is fine with direct
-    // location.href as well.
-    //
-    // Solution that works on BOTH:
-    //  1. Open a new window SYNCHRONOUSLY (before any await) with about:blank.
-    //  2. Write a self-redirecting HTML page into that window immediately —
-    //     this replaces about:blank with a same-origin document that then sets
-    //     its own location to the wa.me URL via a meta-refresh + JS fallback.
-    //     iOS treats this as a same-origin navigation, so it is NOT blocked.
-    //  3. After we get the token from the server we update a global variable
-    //     that the injected page's JS reads before navigating.
-    //
-    // We use a unique key stored on window to pass the URL from this closure
-    // into the injected page's script after the async gap.
-    const transferKey = `_waUrl_${Date.now()}`;
-
-    const waWindow = window.open("", "_blank");
-
-    if (waWindow) {
-      // Write a placeholder page that will poll for the real URL via the key
-      // we set on *this* window (the opener). Once set, it navigates itself.
-      waWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Opening WhatsApp…</title>
-<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f0fdf4;flex-direction:column;gap:12px}p{color:#166534;font-size:16px;font-weight:600}small{color:#6b7280;font-size:13px}</style>
-</head><body>
-<p>⏳ Saving your order…</p>
-<small>You will be redirected to WhatsApp automatically.</small>
-<script>
-(function(){
-  var opener = window.opener;
-  var key = ${JSON.stringify(transferKey)};
-  var attempts = 0;
-  function check(){
-    attempts++;
-    if(opener && opener[key]){
-      var url = opener[key];
-      delete opener[key];
-      window.location.href = url;
-    } else if(attempts < 100){
-      setTimeout(check, 80);
-    } else {
-      document.querySelector('p').textContent = '⚠️ Something went wrong.';
-      document.querySelector('small').textContent = 'Please close this tab and try again.';
-    }
-  }
-  check();
-})();
-</script>
-</body></html>`);
-      waWindow.document.close();
-    }
+    // ── iOS & Android compatible WhatsApp redirect ────────────────────────
+    // window.open() after an `await` is blocked by iOS Safari's popup blocker.
+    // The only strategy that works on BOTH iOS and Android without any popup
+    // issues is: save the order first, then redirect the CURRENT TAB to wa.me.
+    // The user is already on the "Saving order…" spinner so leaving the page
+    // is expected. When they return (back button / app switch), the cart is
+    // cleared and the "Order Sent!" screen is shown.
+    // ─────────────────────────────────────────────────────────────────────
 
     let tokenId: number | undefined;
     try {
@@ -223,8 +177,6 @@ function App() {
         payment_mode: paymentMode,
         total: cartTotal,
       });
-      // API now returns { orderId: token_number, row: {...} }
-      // token_number == the value shown in admin page and sent in WhatsApp
       tokenId =
         result?.orderId ??
         result?.row?.token_number ??
@@ -232,23 +184,22 @@ function App() {
     } catch (err) {
       setCheckoutError("Could not save order to server. Please try again.");
       setCheckoutStep("checkout");
-      if (waWindow && !waWindow.closed) waWindow.close();
       return;
     }
 
-    const tokenStr = tokenId != null ? `#${String(tokenId).padStart(3, "0")}` : "#???";
-    const waUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`;
-
-    if (waWindow && !waWindow.closed) {
-      // Signal the injected page to navigate now.
-      (window as any)[transferKey] = waUrl;
-    } else {
-      // Popup was blocked — fall back to same-tab navigation.
-      window.location.href = waUrl;
-    }
-
+    // Order saved — update state BEFORE navigating so the page shows
+    // "Order Sent!" if the user presses back after WhatsApp.
     setCart([]);
     setCheckoutStep("done");
+
+    const tokenStr = tokenId != null ? `#${String(tokenId).padStart(3, "0")}` : "#???";
+    const waUrl    = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`;
+
+    // 300 ms lets React flush the state update (renders "Order Sent!" screen)
+    // before we navigate away — works on both iOS Safari and Android Chrome.
+    setTimeout(() => {
+      window.location.href = waUrl;
+    }, 300);
   };
   if (!splashDone) return <SplashScreen fading={splashFading} />;
 

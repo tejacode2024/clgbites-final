@@ -121,10 +121,11 @@ function OrderPanel({
   onClose: () => void;
   onOrderDone: () => void;
 }) {
-  const [sending,  setSending]  = useState(false);
-  const [done,     setDone]     = useState(false);
-  const [fieldErr, setFieldErr] = useState("");
-  const [dbErr,    setDbErr]    = useState("");
+  const [sending,        setSending]        = useState(false);
+  const [done,           setDone]           = useState(false);
+  const [fieldErr,       setFieldErr]       = useState("");
+  const [dbErr,          setDbErr]          = useState("");
+  const [confirmedToken, setConfirmedToken] = useState<number | null>(null);
 
   const detailsFilled = custName.trim().length > 0 && custPhone.trim().length >= 10;
   const getItemQty    = (id: string) => cart.find(c => c.id === id)?.qty ?? 0;
@@ -136,31 +137,56 @@ function OrderPanel({
   };
 
   /* Single button: open WA immediately + save to DB concurrently */
+  /* DB-first approach: save order to get atomic token BEFORE opening WhatsApp.
+     The Supabase next_order_token RPC uses a DB sequence — even simultaneous
+     requests are serialised at DB level, so every customer gets a unique token. */
   const handleSendAndSave = async () => {
     if (!custLocked || sending || cart.length === 0) return;
     setSending(true); setDbErr("");
 
-    const lines = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
-    const confirmLine = custMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
-    const msg = `Order from SRM-AP\n\nName: ${custName}\n\nPhone: ${custPhone}\n\n${lines}\n\nTotal: ₹${cartTotal}\n\n${confirmLine}`;
-    const waUrl = `https://wa.me/919989955833?text=${encodeURIComponent(msg)}`;
+    let tokenNumber: number | null = null;
 
-    // Open WA without waiting for DB — atomic token RPC handles concurrent orders
-    window.open(waUrl, "_blank", "noopener,noreferrer");
-
-    // Save to DB concurrently — non-blocking for the user
-    saveOrder({
-      customer_name:  custName,
-      customer_phone: custPhone,
-      items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
-      payment_mode:   custMode,
-      total:          cartTotal,
-    }).catch(err => {
+    try {
+      // Save first — DB sequence guarantees unique token even under concurrent load
+      const result = await saveOrder({
+        customer_name:  custName,
+        customer_phone: custPhone,
+        items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
+        payment_mode:   custMode,
+        total:          cartTotal,
+      });
+      tokenNumber = result.orderId ?? null;
+    } catch (err) {
       console.error("DB save failed:", err);
-      setDbErr("Saved on WhatsApp. DB sync pending.");
-    }).finally(() => setDone(true));
+      setDbErr("Could not save order. Please try again.");
+      setSending(false);
+      return; // Abort — no token, no WA message
+    }
 
-    // Show done screen immediately (don't wait for DB)
+    // Build WA message with confirmed token from DB
+    const tokenTag = tokenNumber
+      ? `🎟️ Token No: *#${String(tokenNumber).padStart(3, "0")}*`
+      : "";
+    const itemLines = cart.map(c => `  • ${c.name} ×${c.qty} — ₹${c.price * c.qty}`).join("\n");
+    const payLine = custMode === "cod" ? "💵 Payment: Cash on Delivery" : "💳 Payment: Prepaid (send QR)";
+    const msg = [
+      `🍽️ *New Order — SRM-AP*`,
+      tokenTag,
+      ``,
+      `👤 Name: ${custName}`,
+      `📞 Phone: ${custPhone}`,
+      ``,
+      `*Items ordered:*`,
+      itemLines,
+      ``,
+      `💰 *Total: ₹${cartTotal}*`,
+      payLine,
+      ``,
+      `Please confirm this order. Thank you! 🙏`,
+    ].filter(Boolean).join("\n");
+
+    window.open(`https://wa.me/919989955833?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+    setConfirmedToken(tokenNumber);
     setDone(true);
   };
 
@@ -169,7 +195,12 @@ function OrderPanel({
       <div className="op-done">
         <div className="op-done-icon"><IcoStar /></div>
         <h3>Order Sent! 🎉</h3>
-        <p>Your order is on WhatsApp and saved to our records.<br />We'll confirm it shortly!</p>
+        {confirmedToken && (
+          <div className="op-token-badge">
+            🎟️ Your Token: <strong>#{String(confirmedToken).padStart(3, "0")}</strong>
+          </div>
+        )}
+        <p>Your order is confirmed on WhatsApp.<br />Show this token when collecting your order.</p>
         {dbErr && <p style={{ fontSize: 12, color: "#e67e22", marginTop: 4 }}>{dbErr}</p>}
         <button className="btn-primary" onClick={onOrderDone}>Start New Order</button>
       </div>
@@ -299,10 +330,18 @@ function OrderPanel({
         ) : (
           <>
             <button className="btn-whatsapp" disabled={sending} onClick={handleSendAndSave}>
-              <IcoWA />
-              {sending ? "Sending…" : "Send Order on WhatsApp"}
+              {sending ? (
+                <span className="op-btn-sending">
+                  <span className="op-spinner" />
+                  Saving order…
+                </span>
+              ) : (
+                <><IcoWA /> Send Order on WhatsApp</>
+              )}
             </button>
-            <p className="op-send-hint">Order is saved automatically when you tap Send</p>
+            <p className="op-send-hint">
+              {sending ? "Getting your token number from server…" : "Order is saved & token assigned when you tap Send"}
+            </p>
           </>
         )}
       </div>
@@ -406,17 +445,8 @@ function App() {
       )}
 
       {cartOpen && (
-        <div className="cart-overlay" onClick={() => setCartOpen(false)}>
-          <div className="cart-panel" onClick={e => e.stopPropagation()}>
-            <div className="cart-header">
-              <h2>Your Order</h2>
-              <button className="cart-close-btn" onClick={() => setCartOpen(false)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            </div>
-            <OrderPanel
+        <CartDrawer onClose={() => setCartOpen(false)}>
+          <OrderPanel
               cart={cart} cartTotal={cartTotal} addItem={addItem} removeItem={removeItem}
               siteOnline={siteOnline}
               custName={custName} setCustName={setCustName}
@@ -426,8 +456,7 @@ function App() {
               onClose={() => setCartOpen(false)}
               onOrderDone={() => { setCart([]); setCustName(""); setCustPhone(""); setCustMode("cod"); setCustLocked(false); setCartOpen(false); }}
             />
-          </div>
-        </div>
+        </CartDrawer>
       )}
 
       <main className="clg-main">

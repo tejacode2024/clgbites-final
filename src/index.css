@@ -823,3 +823,39 @@
 .op-empty-icon { color: var(--border); margin-bottom: 4px; }
 .op-empty p    { font-size: 17px; font-weight: 600; color: var(--text-med); margin: 0; }
 .op-empty span { font-size: 13px; color: var(--text-light); }
+
+/* ── TOKEN BADGE on done screen ── */
+.op-token-badge {
+  background: linear-gradient(135deg, var(--gold-light), var(--orange));
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 12px 28px;
+  border-radius: 16px;
+  letter-spacing: .5px;
+  box-shadow: 0 4px 18px rgba(212,160,23,.45);
+  display: flex; align-items: center; gap: 8px;
+  animation: tokenPop .5s cubic-bezier(.175,.885,.32,1.275) both;
+}
+.op-token-badge strong {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+@keyframes tokenPop {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* ── Sending spinner on WA button ── */
+.op-btn-sending {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.op-spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35);
+  border-top-color: #fff;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

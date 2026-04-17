@@ -730,6 +730,7 @@ function OrderCard({ order, onUpd, onDel, onDlv }: { order: LocalOrder; onUpd: (
 function AdminOrders({ apiOrders, loading, onRefresh, secret, onOrdersChanged }: {
   apiOrders: any[]; loading: boolean; onRefresh: () => void; secret: string; onOrdersChanged: () => void;
 }) {
+  // Initialise immediately from apiOrders — no artificial loading delay
   const [orders, setOrders] = useState<LocalOrder[]>(() => apiOrders.map(apiToLocal));
   const [search, setSearch] = useState("");
   const [upd, setUpd] = useState<LocalOrder | null>(null);
@@ -739,7 +740,7 @@ function AdminOrders({ apiOrders, loading, onRefresh, secret, onOrdersChanged }:
   const [busy, setBusy] = useState(false);
   // Clear only enabled after Export has been clicked at least once
   const [exported, setExported] = useState(false);
-   const prevOrderCount = useRef(0);
+  const prevOrderCount = useRef(0);
 
   useEffect(() => {
     // If new orders arrive after export, require re-export before clearing
@@ -749,16 +750,25 @@ function AdminOrders({ apiOrders, loading, onRefresh, secret, onOrdersChanged }:
     prevOrderCount.current = apiOrders.length;
   }, [apiOrders.length]);
 
- useEffect(() => {
+  // Track IDs that have been optimistically marked delivered so sync doesn't revert them
+  const pendingDeliveryIds = useRef<Set<string | number>>(new Set());
+
+  useEffect(() => {
     setOrders(prev => {
-  const prevMap = new Map(prev.map(o => [o.id, o]));
-return apiOrders.map((o) => {
-  const existing = prevMap.get(o.id);
-  const fresh = apiToLocal(o);
-  if (!existing) return fresh;
-  return { ...fresh, status: existing.status, paymentStatus: existing.paymentStatus, pendingAmount: existing.pendingAmount };
-}).filter(Boolean) as LocalOrder[];
-});
+      const prevMap = new Map(prev.map(o => [o.id, o]));
+      return apiOrders.map((o) => {
+        const existing = prevMap.get(o.id);
+        const fresh = apiToLocal(o);
+        if (!existing) return fresh;
+        // If we optimistically delivered this order, don't let stale apiOrders revert it
+        if (pendingDeliveryIds.current.has(o.id)) {
+          return { ...fresh, status: existing.status, paymentStatus: existing.paymentStatus, pendingAmount: existing.pendingAmount };
+        }
+        // For non-delivered orders, trust the DB status (handles cases where admin
+        // marked delivered on another device)
+        return { ...fresh };
+      }).filter(Boolean) as LocalOrder[];
+    });
   }, [apiOrders]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }, [toast]);
 
@@ -790,16 +800,32 @@ return apiOrders.map((o) => {
 const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => {
     if (!pay) return;
     const id = pay.id;
+    setBusy(true);
+
+    // Register as pending so sync useEffect doesn't revert our optimistic update
+    pendingDeliveryIds.current.add(id);
+
+    // Optimistic UI: fade then mark delivered
     setOrders(p => p.map(o => o.id === id ? { ...o, fadingOut: true, paymentStatus: status, pendingAmount: amount } : o));
-    setTimeout(() => setOrders(p => p.map(o => o.id === id ? { ...o, fadingOut: false, status: "delivered" } : o)), 600);
+    setTimeout(() => setOrders(p => p.map(o => o.id === id ? { ...o, fadingOut: false, status: "delivered" } : o)), 500);
     setPay(null);
+
     try {
       await patchOrder(id, {
         deliver_status: "delivered",
         pay_status: status,
         pending_amount: status === "pending" ? (amount ?? null) : null,
       }, secret);
-    } catch { showToast("Deliver save failed ✗"); }
+      showToast("Delivered ✓");
+      // Once DB confirms, remove from pending set — next sync will use DB truth
+      setTimeout(() => pendingDeliveryIds.current.delete(id), 5000);
+    } catch {
+      // Revert optimistic update on failure
+      pendingDeliveryIds.current.delete(id);
+      setOrders(p => p.map(o => o.id === id ? { ...o, fadingOut: false, status: "pending" } : o));
+      showToast("Deliver failed — please try again ✗");
+    }
+    setBusy(false);
   };
   /* Export → /api/export → .xlsx; enables Clear button */
   const doExport = async () => {

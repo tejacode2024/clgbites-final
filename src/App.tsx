@@ -280,10 +280,19 @@ function App() {
               </div>
             ) : checkoutStep === "confirm" ? (
               <WhatsAppConfirmStep
-                waUrl={waUrl}
+                cart={cart}
+                cartTotal={cartTotal}
+                addItem={addItem}
+                removeItem={removeItem}
                 details={confirmDetails}
                 onDone={() => { setCart([]); setCheckoutStep("done"); }}
-                onAddMore={() => { setCheckoutStep("cart"); setCartOpen(false); }}
+                onAddMore={() => {
+                  setCartOpen(false);
+                  setCheckoutStep("cart");
+                  setTimeout(() => {
+                    document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
+                  }, 50);
+                }}
               />
             ) : checkoutStep === "checkout" ? (
               <CheckoutForm
@@ -686,112 +695,182 @@ function MenuSection({ categories, addItem, removeItem, getQty, openCats, setOpe
 }
 
 /* ─────────────────────────────────────────────
-   CHECKOUT FORM
-───────────────────────────────────────────── */
-/* ─────────────────────────────────────────────
    WHATSAPP CONFIRM STEP
 ───────────────────────────────────────────── */
-const WA_ICON = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+// Shared icon constants — match the site's warm, food-forward identity
+const IconUser = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+const IconPhone = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.71 3.35 2 2 0 0 1 3.68 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.64a16 16 0 0 0 6 6l1.06-1.06a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+  </svg>
+);
+const IconWallet = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+  </svg>
+);
+const IconEdit = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const IconPlus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IconMinus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+const IconWA = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
     <path d="M12.004 0C5.374 0 0 5.373 0 12c0 2.117.554 4.1 1.522 5.822L.048 23.998l6.352-1.656A11.954 11.954 0 0012.004 24C18.628 24 24 18.627 24 12S18.628 0 12.004 0zm0 21.818a9.817 9.817 0 01-5.002-1.368l-.36-.214-3.72.97.999-3.645-.236-.375a9.817 9.817 0 01-1.499-5.186C2.186 6.58 6.591 2.18 12.004 2.18 17.41 2.18 21.814 6.58 21.814 12c0 5.41-4.404 9.818-9.81 9.818z"/>
   </svg>
 );
 
 function WhatsAppConfirmStep({
-  waUrl, details, onDone, onAddMore
+  cart, cartTotal, addItem, removeItem,
+  details, onDone, onAddMore,
 }: {
-  waUrl: string;
+  cart: CartItem[];
+  cartTotal: number;
+  addItem: (item: { id: string; name: string; price: number; img: string }) => void;
+  removeItem: (id: string) => void;
   details: { cart: CartItem[]; name: string; phone: string; mode: "cod" | "prepaid"; total: number; } | null;
   onDone: () => void;
   onAddMore: () => void;
 }) {
   const sentRef = useRef(false);
 
-  // When user comes BACK to the tab after opening WhatsApp → show "Order Sent"
+  // Local editable state — starts from saved snapshot, stays in sync as user types
+  const [editName,  setEditName]  = useState(details?.name  ?? "");
+  const [editPhone, setEditPhone] = useState(details?.phone ?? "");
+  const [editMode,  setEditMode]  = useState<"cod" | "prepaid">(details?.mode ?? "cod");
+
+  // When user returns to tab after opening WhatsApp → show done screen
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible" && sentRef.current) {
-        onDone();
-      }
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && sentRef.current) onDone();
     };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [onDone]);
 
-  const handleOpen = () => {
+  const handleSend = () => {
     sentRef.current = true;
-    window.open(waUrl, "_blank", "noopener,noreferrer");
-    // On iOS, visibilitychange fires when tab loses focus to WhatsApp.
-    // Set a fallback so returning to this tab triggers onDone reliably.
+
+    const lines       = cart.map(c => `• ${c.name} ×${c.qty} = ₹${c.price * c.qty}`).join("\n");
+    const confirmLine = editMode === "cod" ? "Confirm my order on COD" : "Confirm my order and send QR";
+    const buildMsg    = (tok: string) =>
+      `Order from SRM-AP\n\nToken: ${tok}\n\nName: ${editName}\n\nPhone: ${editPhone}\n\n${lines}\n\nTotal: ₹${cartTotal}\n\n${confirmLine}`;
+
+    const immediateUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg("#..."))}`;
+    window.open(immediateUrl, "_blank", "noopener,noreferrer");
+
+    // Fire-and-forget DB save with latest edits
+    saveOrder({
+      customer_name: editName,
+      customer_phone: editPhone,
+      items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
+      payment_mode: editMode,
+      total: cartTotal,
+    }).catch(() => {/* non-blocking */});
   };
+
+  const canSend = editName.trim().length > 0 && editPhone.trim().length > 0 && cart.length > 0;
 
   return (
     <div className="wa-confirm-step">
 
-      {/* ── Header ── */}
-      <div className="wa-confirm-hero">
-        <div className="wa-confirm-icon">📋</div>
-        <h3>Review &amp; Send</h3>
-        <p className="wa-confirm-tagline">Verify your order before sending it on WhatsApp</p>
+      {/* ── Section: Your Order ── */}
+      <div className="wac-section">
+        <div className="wac-section-head">
+          <span className="wac-section-title">Your Order</span>
+          <button className="wac-link" onClick={onAddMore}>Add items</button>
+        </div>
+
+        <div className="wac-items">
+          {cart.map(item => (
+            <div key={item.id} className="wac-item">
+              <img src={item.img} alt={item.name} className="wac-item-img" onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
+              <span className="wac-item-name">{item.name}</span>
+              <div className="wac-qty">
+                <button onClick={() => removeItem(item.id)}><IconMinus /></button>
+                <span>{item.qty}</span>
+                <button onClick={() => addItem({ id: item.id, name: item.name, price: item.price, img: item.img })}><IconPlus /></button>
+              </div>
+              <span className="wac-item-price">₹{item.price * item.qty}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="wac-total">
+          <span>Total</span>
+          <span>₹{cartTotal}</span>
+        </div>
       </div>
 
-      {/* ── Order details card ── */}
-      {details && (
-        <div className="wa-order-card">
-          <div className="wa-order-meta">
-            <div className="wa-meta-row">
-              <span className="wa-meta-label">👤 Name</span>
-              <span className="wa-meta-val">{details.name}</span>
-            </div>
-            <div className="wa-meta-row">
-              <span className="wa-meta-label">📞 Phone</span>
-              <span className="wa-meta-val">{details.phone}</span>
-            </div>
-            <div className="wa-meta-row">
-              <span className="wa-meta-label">💳 Payment</span>
-              <span className="wa-meta-val">{details.mode === "cod" ? "💵 Cash on Delivery" : "📱 Prepaid (QR)"}</span>
-            </div>
-          </div>
-
-          <div className="wa-order-divider" />
-
-          <div className="wa-order-items">
-            {details.cart.map(c => (
-              <div key={c.id} className="wa-order-item">
-                <span className="wa-item-name">{c.name} <span className="wa-item-qty">×{c.qty}</span></span>
-                <span className="wa-item-price">₹{c.price * c.qty}</span>
-              </div>
-            ))}
-            <div className="wa-order-total">
-              <span>Total</span>
-              <span>₹{details.total}</span>
-            </div>
-          </div>
-
-          <button className="wa-add-more" onClick={onAddMore}>
-            + Add or remove items
-          </button>
+      {/* ── Section: Details ── */}
+      <div className="wac-section">
+        <div className="wac-section-head">
+          <span className="wac-section-title">Your Details</span>
+          <span className="wac-edit-hint"><IconEdit /> tap to edit</span>
         </div>
-      )}
 
-      {/* ── WhatsApp send instruction ── */}
-      <div className="wa-instruction-card">
-        <p className="wa-instruction-label">How to send</p>
-        <div className="wa-send-visual">
-          <div className="wa-message-bubble">
-            <span className="wa-bubble-text">Your order is pre-filled ✓</span>
+        <div className="wac-fields">
+          <div className="wac-field">
+            <span className="wac-field-icon"><IconUser /></span>
+            <input
+              className="wac-field-input"
+              type="text"
+              placeholder="Your name"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+            />
           </div>
-          <div className="wa-send-btn-mock">▶</div>
+          <div className="wac-field">
+            <span className="wac-field-icon"><IconPhone /></span>
+            <input
+              className="wac-field-input"
+              type="tel"
+              placeholder="Mobile number"
+              value={editPhone}
+              onChange={e => setEditPhone(e.target.value)}
+            />
+          </div>
+          <div className="wac-field wac-field-payment">
+            <span className="wac-field-icon"><IconWallet /></span>
+            <label className={`wac-pay-opt ${editMode === "cod" ? "active" : ""}`}>
+              <input type="radio" name="wac-pay" checked={editMode === "cod"} onChange={() => setEditMode("cod")} />
+              Cash on Delivery
+            </label>
+            <label className={`wac-pay-opt ${editMode === "prepaid" ? "active" : ""}`}>
+              <input type="radio" name="wac-pay" checked={editMode === "prepaid"} onChange={() => setEditMode("prepaid")} />
+              Prepaid (QR)
+            </label>
+          </div>
         </div>
-        <p className="wa-instruction-hint">Tap the green <strong>▶ Send</strong> button inside WhatsApp to place your order</p>
       </div>
 
       {/* ── CTA ── */}
-      <button className="btn-whatsapp wa-open-btn" onClick={handleOpen}>
-        {WA_ICON}
-        Send Order on WhatsApp
-      </button>
+      <div className="wac-cta">
+        <button className="btn-whatsapp" disabled={!canSend} onClick={handleSend}>
+          <IconWA />
+          Send Order on WhatsApp
+        </button>
+        <p className="wac-hint">
+          WhatsApp opens with your order. Just tap
+          <span className="wac-send-badge">Send ▶</span>
+          to confirm.
+        </p>
+      </div>
 
     </div>
   );

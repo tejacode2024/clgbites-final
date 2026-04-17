@@ -636,28 +636,28 @@ function OrderCard({ order, onUpd, onDel, onDlv }: { order: LocalOrder; onUpd: (
       {/* Items list */}
       <div style={{ margin: "0 16px 12px", background: C.stripe, borderRadius: 12, padding: "10px 14px" }}>
         {order.items.map((item, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: i < order.items.length - 1 ? 6 : 0 }}>
-            <span style={{ fontSize: 13, color: C.brand }}>{item.name}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginLeft: 8 }}>×{item.qty}</span>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < order.items.length - 1 ? 8 : 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.orange, minWidth: 32, textAlign: "center", background: "#FEF0E6", borderRadius: 8, padding: "3px 6px" }}>×{item.qty}</span>
+            <span style={{ fontSize: 14, color: C.brand, lineHeight: 1.3 }}>{item.name}</span>
           </div>
         ))}
       </div>
 
       {/* Footer: total + actions */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 14px" }}>
-        <span style={{ fontSize: 18, fontWeight: 800, color: C.brand }}>{fmtMoney(order.total)}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px 16px" }}>
+        <span style={{ fontSize: 20, fontWeight: 800, color: C.brand }}>{fmtMoney(order.total)}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
 
           {/* Call button — links to customer phone directly */}
-          <a href={`tel:${order.phone}`} style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, background: "#ECFDF5", border: "1px solid #86EFAC", textDecoration: "none" }}>
-            <Phone size={16} color="#065F46" />
+          <a href={`tel:${order.phone}`} style={{ width: 46, height: 46, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 14, background: "#ECFDF5", border: "1px solid #86EFAC", textDecoration: "none" }}>
+            <Phone size={19} color="#065F46" />
           </a>
 
           {/* ... menu (edit + delete) */}
           <div ref={menuRef} style={{ position: "relative" }}>
             <button
               onClick={() => setMenuOpen(o => !o)}
-              style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border: `1px solid ${C.border}`, background: C.stripe, cursor: "pointer", fontSize: 18, fontWeight: 700, color: C.brand, letterSpacing: 1 }}
+              style={{ width: 46, height: 46, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 14, border: `1px solid ${C.border}`, background: C.stripe, cursor: "pointer", fontSize: 20, fontWeight: 700, color: C.brand, letterSpacing: 1 }}
             >
               ···
             </button>
@@ -675,8 +675,8 @@ function OrderCard({ order, onUpd, onDel, onDlv }: { order: LocalOrder; onUpd: (
           </div>
 
           {/* Deliver button */}
-          <button onClick={() => !dlvd && onDlv()} disabled={dlvd} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 12, border: "none", fontSize: 13, fontWeight: 600, cursor: dlvd ? "default" : "pointer", background: dlvd ? "#ECFDF5" : C.orange, color: dlvd ? "#065F46" : "#fff" }}>
-            <CheckCircle2 size={15} />{dlvd ? "Delivered" : "Deliver"}
+          <button onClick={() => !dlvd && onDlv()} disabled={dlvd} style={{ display: "flex", alignItems: "center", gap: 7, padding: "11px 18px", borderRadius: 14, border: "none", fontSize: 14, fontWeight: 700, cursor: dlvd ? "default" : "pointer", background: dlvd ? "#ECFDF5" : C.orange, color: dlvd ? "#065F46" : "#fff" }}>
+            <CheckCircle2 size={17} />{dlvd ? "Delivered" : "Deliver"}
           </button>
         </div>
       </div>

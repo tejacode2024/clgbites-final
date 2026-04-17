@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import ExcelJS from 'exceljs'
-
+const wb = new ExcelJS.Workbook();
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function fmtDT(iso) {

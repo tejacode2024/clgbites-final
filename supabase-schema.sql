@@ -4,7 +4,8 @@
 
 -- 1. ORDERS TABLE
 create table if not exists orders (
-  id             bigserial primary key,          -- id IS the token number
+  id             bigserial primary key,          -- internal DB row id
+  token_number   bigint      not null unique,     -- THE token shown to user / sent via WhatsApp
   customer_name  text        not null,
   customer_phone text        not null,
   items          jsonb       not null,
@@ -18,7 +19,12 @@ create table if not exists orders (
 
 create index if not exists orders_created_at_idx on orders(created_at desc);
 
--- 2. CONFIG TABLE
+-- 2. SEPARATE TOKEN SEQUENCE
+--    This sequence NEVER resets when orders are deleted, so tokens are always unique.
+--    Only reset manually if you want a fresh start (e.g. new season).
+create sequence if not exists order_token_seq start 1 increment 1;
+
+-- 3. CONFIG TABLE
 create table if not exists config (
   id            integer     primary key default 1,
   site_online   boolean     not null default true,
@@ -30,15 +36,29 @@ insert into config (id, site_online, item_flags)
 values (1, true, '{}')
 on conflict (id) do nothing;
 
--- 3. FUNCTION: reset sequence so next id starts from 1 after clearing all orders
-create or replace function reset_orders_sequence()
+-- 4. FUNCTION: get next unique token number (atomic — safe under concurrent inserts)
+create or replace function next_order_token()
+returns bigint language sql as $$
+  select nextval('order_token_seq');
+$$;
+
+-- 5. FUNCTION: reset token sequence to 1 (call manually when needed)
+create or replace function reset_token_sequence()
 returns void language plpgsql as $$
 begin
-  perform setval(pg_get_serial_sequence('orders', 'id'), 1, false);
+  perform setval('order_token_seq', 1, false);
 end;
 $$;
 
--- 4. ROW-LEVEL SECURITY
+-- 6. LEGACY alias kept for backward compat (was called reset_id_sequence in old code)
+create or replace function reset_id_sequence()
+returns void language plpgsql as $$
+begin
+  perform setval('order_token_seq', 1, false);
+end;
+$$;
+
+-- 7. ROW-LEVEL SECURITY
 alter table orders enable row level security;
 
 create policy "Anyone can place an order"

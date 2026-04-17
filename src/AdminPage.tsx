@@ -158,9 +158,12 @@ function tokenNum(t: string) { return parseInt(t.replace(/\D/g,""), 10) || 0; }
 function fmtMoney(n: number) { return `₹${n}`; }
 
 function apiToLocal(o: any): LocalOrder {
+  // token_number is the canonical public token — same in DB, WhatsApp message, and admin UI.
+  // We use token_number as the `id` field so PATCH/DELETE calls use the right identifier.
+  const tok = o.token_number ?? o.id;
   return {
-    id: o.id,
-    token: `#${String(o.token_number ?? o.id).padStart(3, "0")}`,
+    id: tok,
+    token: `#${String(tok).padStart(3, "0")}`,
     name: o.customer_name ?? "—",
     phone: o.customer_phone ?? "—",
     items: (o.items ?? []).map((it: any) => ({ name: it.name, qty: it.qty ?? 1 })),
@@ -411,13 +414,14 @@ function AdminOverview({ siteOnline, setSiteOnline, patchConfig, saving, orders,
           ? <p style={{ textAlign: "center", padding: "24px 0", fontSize: 13, color: C.muted }}>No orders yet today 🎉</p>
           : <div>
               {recentOrders.map((o: any, i: number) => {
-                const tokenIdx = orders.indexOf(o) + 1;
+                // Always use token_number (the real token) — never an array index.
+                const tokenDisplay = `#${String(o.token_number ?? o.id).padStart(3, "0")}`;
                 return (
                   <div key={o.id}>
                     {i > 0 && <hr style={divider} />}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={tagOrange}>#{String(tokenIdx).padStart(3, "0")}</span>
+                        <span style={tagOrange}>{tokenDisplay}</span>
                         <div>
                           <p style={{ fontSize: 13, fontWeight: 600, color: C.brand, margin: 0 }}>{o.customer_name}</p>
                           <p style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{(o.items ?? []).map((it: any) => it.name).join(", ")}</p>

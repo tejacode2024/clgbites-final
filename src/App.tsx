@@ -102,60 +102,10 @@ function AddButton({ item, addItem, removeItem, qty }: {
   );
 }
 
-/* ── MINI MENU SHEET (inside cart drawer) ── */
-function MiniMenuSheet({ allMenuData, isItemEnabled, addItem, removeItem, getQty, onClose }: {
-  allMenuData: typeof MENU_DATA;
-  isItemEnabled: (id: string) => boolean;
-  addItem: (item: { id: string; name: string; price: number; img: string }) => void;
-  removeItem: (id: string) => void;
-  getQty: (id: string) => number;
-  onClose: () => void;
-}) {
-  const [openCats, setOpenCats] = useState<Record<string, boolean>>({ biryani: true, pulaoRice: false, tandoori: false });
-  return (
-    <div className="mini-menu-sheet">
-      <div className="mms-header">
-        <span className="mms-title">🍽️ Add More Items</span>
-        <button className="mms-close" onClick={onClose}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <div className="mms-body">
-        {Object.entries(allMenuData).map(([key, cat]) => (
-          <div key={key} className="mms-category">
-            <button className="mms-cat-header" onClick={() => setOpenCats(p => ({ ...p, [key]: !p[key] }))}>
-              <span>{cat.emoji} {cat.label}</span>
-              <span className={`cat-arrow ${openCats[key] ? "open" : ""}`}>▾</span>
-            </button>
-            {openCats[key] && (
-              <div className="mms-items">
-                {cat.items.filter(i => isItemEnabled(i.id)).map(item => (
-                  <div key={item.id} className="mms-item">
-                    <div className="mms-item-info">
-                      <div className={`veg-icon ${item.veg ? "veg" : "nonveg"}`}><span /></div>
-                      <div>
-                        <div className="mms-item-name">{item.name}</div>
-                        <div className="mms-item-price">₹{item.price}</div>
-                      </div>
-                    </div>
-                    <AddButton item={item} addItem={addItem} removeItem={removeItem} qty={getQty(item.id)} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /* ── ORDER PANEL ── */
 function OrderPanel({
   cart, cartTotal, addItem, removeItem, siteOnline,
-  allMenuData, isItemEnabled,
   custName, setCustName, custPhone, setCustPhone,
   custMode, setCustMode, custLocked, setCustLocked,
   onOrderDone,
@@ -164,15 +114,13 @@ function OrderPanel({
   addItem: (item: { id: string; name: string; price: number; img: string }) => void;
   removeItem: (id: string) => void;
   siteOnline: boolean;
-  allMenuData: typeof MENU_DATA;
-  isItemEnabled: (id: string) => boolean;
   custName: string;    setCustName:   (v: string) => void;
   custPhone: string;   setCustPhone:  (v: string) => void;
   custMode: "cod" | "prepaid"; setCustMode: (m: "cod" | "prepaid") => void;
   custLocked: boolean; setCustLocked: (v: boolean) => void;
+  onClose: () => void;
   onOrderDone: () => void;
 }) {
-  const [showMenu, setShowMenu] = useState(false);
   const [sending,  setSending]  = useState(false);
   const [done,     setDone]     = useState(false);
   const [fieldErr, setFieldErr] = useState("");
@@ -228,33 +176,26 @@ function OrderPanel({
     );
   }
 
-  if (cart.length === 0 && !showMenu) {
+  if (cart.length === 0) {
     return (
       <div className="op-empty">
         <div className="op-empty-icon"><IcoBag /></div>
         <p>Your cart is empty</p>
         <span>Add something delicious from the menu</span>
-        <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => setShowMenu(true)}>Browse Menu</button>
+        <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => { onClose(); setTimeout(() => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" }), 80); }}>Browse Menu</button>
       </div>
     );
   }
 
   return (
     <div className="op-root">
-      {showMenu && (
-        <MiniMenuSheet
-          allMenuData={allMenuData} isItemEnabled={isItemEnabled}
-          addItem={addItem} removeItem={removeItem} getQty={getItemQty}
-          onClose={() => setShowMenu(false)}
-        />
-      )}
 
       <div className="op-scroll-body">
         {/* Section 1: Cart Items */}
         <div className="op-section">
           <div className="op-section-head">
             <span className="op-label">Your Order</span>
-            <button className="op-add-more-btn" onClick={() => setShowMenu(true)}>
+            <button className="op-add-more-btn" onClick={() => { onClose(); setTimeout(() => document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" }), 80); }}>
               <IcoPlus /> Add Items
             </button>
           </div>
@@ -477,7 +418,7 @@ function App() {
             </div>
             <OrderPanel
               cart={cart} cartTotal={cartTotal} addItem={addItem} removeItem={removeItem}
-              siteOnline={siteOnline} allMenuData={MENU_DATA} isItemEnabled={isItemEnabled}
+              siteOnline={siteOnline}
               custName={custName} setCustName={setCustName}
               custPhone={custPhone} setCustPhone={setCustPhone}
               custMode={custMode} setCustMode={setCustMode}

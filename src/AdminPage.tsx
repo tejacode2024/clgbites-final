@@ -750,24 +750,22 @@ function AdminOrders({ apiOrders, loading, onRefresh, secret, onOrdersChanged }:
     prevOrderCount.current = apiOrders.length;
   }, [apiOrders.length]);
 
-  // Track IDs that have been optimistically marked delivered so sync doesn't revert them
-  const pendingDeliveryIds = useRef<Set<string | number>>(new Set());
+  // Track which token_number IDs we have locally so we can merge new arrivals
+  const knownIds = useRef<Set<string | number>>(new Set(apiOrders.map(o => o.token_number ?? o.id)));
 
   useEffect(() => {
+    // Only add genuinely NEW orders from polling — never touch existing local state.
+    // This prevents the poll from reverting optimistic "delivered" updates.
     setOrders(prev => {
-      const prevMap = new Map(prev.map(o => [o.id, o]));
-      return apiOrders.map((o) => {
-        const existing = prevMap.get(o.id);
-        const fresh = apiToLocal(o);
-        if (!existing) return fresh;
-        // If we optimistically delivered this order, don't let stale apiOrders revert it
-        if (pendingDeliveryIds.current.has(o.id)) {
-          return { ...fresh, status: existing.status, paymentStatus: existing.paymentStatus, pendingAmount: existing.pendingAmount };
-        }
-        // For non-delivered orders, trust the DB status (handles cases where admin
-        // marked delivered on another device)
-        return { ...fresh };
-      }).filter(Boolean) as LocalOrder[];
+      const prevTokens = new Set(prev.map(o => o.id));
+      const newOrders = apiOrders
+        .filter(o => {
+          const tok = o.token_number ?? o.id;
+          return !prevTokens.has(tok);
+        })
+        .map(apiToLocal);
+      if (newOrders.length === 0) return prev;
+      return [...prev, ...newOrders];
     });
   }, [apiOrders]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); }, [toast]);
@@ -799,31 +797,33 @@ function AdminOrders({ apiOrders, loading, onRefresh, secret, onOrdersChanged }:
   };
 const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => {
     if (!pay) return;
-    const id = pay.id;
+    const orderId = pay.id;  // this is token_number — matches what PATCH API expects
     setBusy(true);
-
-    // Register as pending so sync useEffect doesn't revert our optimistic update
-    pendingDeliveryIds.current.add(id);
-
-    // Optimistic UI: fade then mark delivered
-    setOrders(p => p.map(o => o.id === id ? { ...o, fadingOut: true, paymentStatus: status, pendingAmount: amount } : o));
-    setTimeout(() => setOrders(p => p.map(o => o.id === id ? { ...o, fadingOut: false, status: "delivered" } : o)), 500);
     setPay(null);
 
+    // Show fade animation immediately for responsiveness
+    setOrders(p => p.map(o => o.id === orderId ? { ...o, fadingOut: true } : o));
+
     try {
-      await patchOrder(id, {
+      // DB call first — if this fails we revert, no stale state issues
+      await patchOrder(orderId, {
         deliver_status: "delivered",
         pay_status: status,
         pending_amount: status === "pending" ? (amount ?? null) : null,
       }, secret);
+
+      // DB confirmed — now update local state permanently
+      setOrders(p => p.map(o =>
+        o.id === orderId
+          ? { ...o, fadingOut: false, status: "delivered", paymentStatus: status, pendingAmount: amount }
+          : o
+      ));
       showToast("Delivered ✓");
-      // Once DB confirms, remove from pending set — next sync will use DB truth
-      setTimeout(() => pendingDeliveryIds.current.delete(id), 5000);
-    } catch {
-      // Revert optimistic update on failure
-      pendingDeliveryIds.current.delete(id);
-      setOrders(p => p.map(o => o.id === id ? { ...o, fadingOut: false, status: "pending" } : o));
-      showToast("Deliver failed — please try again ✗");
+    } catch (err) {
+      // Revert fade on failure
+      setOrders(p => p.map(o => o.id === orderId ? { ...o, fadingOut: false } : o));
+      showToast("Deliver failed — check connection and retry ✗");
+      console.error("patchOrder failed:", err);
     }
     setBusy(false);
   };

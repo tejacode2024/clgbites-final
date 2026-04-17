@@ -24,7 +24,7 @@ create index if not exists orders_created_at_idx on orders(created_at desc);
 --    Only reset manually if you want a fresh start (e.g. new season).
 create sequence if not exists order_token_seq start 1 increment 1;
 
--- 3. CONFIG TABLE
+-- 3. CONFIG TABL
 create table if not exists config (
   id            integer     primary key default 1,
   site_online   boolean     not null default true,

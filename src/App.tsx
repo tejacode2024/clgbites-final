@@ -97,7 +97,8 @@ function App() {
   const [menuOpen, setMenuOpen]         = useState(false);
   const [cartOpen, setCartOpen]         = useState(false);
   const [openCats, setOpenCats]         = useState<Record<string, boolean>>({ biryani: true, pulaoRice: false, tandoori: false });
-  const [checkoutStep, setCheckoutStep] = useState<"cart" | "checkout" | "saving" | "done">("cart");
+  const [checkoutStep, setCheckoutStep] = useState<"cart" | "checkout" | "saving" | "confirm" | "done">("cart");
+  const [waUrl, setWaUrl] = useState<string>("");
   const [paymentMode, setPaymentMode]   = useState<"cod" | "prepaid">("cod");
   const [customerName, setCustomerName]     = useState("");
   const [customerPhone, setCustomerPhone]   = useState("");
@@ -195,19 +196,11 @@ function App() {
       return;
     }
 
-    // Order saved — update state BEFORE navigating so the page shows
-    // "Order Sent!" if the user presses back after WhatsApp.
-    setCart([]);
-    setCheckoutStep("done");
-
+    // Order saved — show confirm step so user must explicitly send the WA message.
     const tokenStr = tokenId != null ? `#${String(tokenId).padStart(3, "0")}` : "#???";
-    const waUrl    = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`;
-
-    // 300 ms lets React flush the state update (renders "Order Sent!" screen)
-    // before we navigate away — works on both iOS Safari and Android Chrome.
-    setTimeout(() => {
-      window.location.href = waUrl;
-    }, 300);
+    const builtUrl = `https://wa.me/919989955833?text=${encodeURIComponent(buildMsg(tokenStr))}`;
+    setWaUrl(builtUrl);
+    setCheckoutStep("confirm");
   };
   if (!splashDone) return <SplashScreen fading={splashFading} />;
 
@@ -284,6 +277,11 @@ function App() {
                 <h3>Saving order…</h3>
                 <p>Please wait a moment.</p>
               </div>
+            ) : checkoutStep === "confirm" ? (
+              <WhatsAppConfirmStep
+                waUrl={waUrl}
+                onDone={() => { setCart([]); setCheckoutStep("done"); }}
+              />
             ) : checkoutStep === "checkout" ? (
               <CheckoutForm
                 cart={cart}
@@ -687,6 +685,82 @@ function MenuSection({ categories, addItem, removeItem, getQty, openCats, setOpe
 /* ─────────────────────────────────────────────
    CHECKOUT FORM
 ───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────
+   WHATSAPP CONFIRM STEP
+───────────────────────────────────────────── */
+function WhatsAppConfirmStep({ waUrl, onDone }: { waUrl: string; onDone: () => void }) {
+  const [hasSent, setHasSent] = useState(false);
+  const [opened, setOpened] = useState(false);
+
+  const handleOpen = () => {
+    setOpened(true);
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div className="wa-confirm-step">
+      <div className="wa-confirm-icon">📲</div>
+      <h3>One More Step!</h3>
+      <p className="wa-confirm-subtext">
+        Your order is saved. Now you <strong>must send the message on WhatsApp</strong> to complete your order.
+      </p>
+
+      <div className="wa-steps-list">
+        <div className={`wa-step ${opened ? "wa-step-done" : ""}`}>
+          <span className="wa-step-num">{opened ? "✓" : "1"}</span>
+          <div>
+            <strong>Open WhatsApp</strong>
+            <p>Tap the button below to open WhatsApp with your order pre-filled.</p>
+          </div>
+        </div>
+        <div className={`wa-step ${hasSent ? "wa-step-done" : ""}`}>
+          <span className="wa-step-num">{hasSent ? "✓" : "2"}</span>
+          <div>
+            <strong>Hit the Send button</strong>
+            <p>Tap the green <strong>Send ▶</strong> button inside WhatsApp — don't just open and close!</p>
+          </div>
+        </div>
+        <div className="wa-step">
+          <span className="wa-step-num">3</span>
+          <div>
+            <strong>Come back here & confirm</strong>
+            <p>Check the box below once you've sent it.</p>
+          </div>
+        </div>
+      </div>
+
+      <button className="btn-whatsapp wa-open-btn" onClick={handleOpen}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <path d="M12.004 0C5.374 0 0 5.373 0 12c0 2.117.554 4.1 1.522 5.822L.048 23.998l6.352-1.656A11.954 11.954 0 0012.004 24C18.628 24 24 18.627 24 12S18.628 0 12.004 0zm0 21.818a9.817 9.817 0 01-5.002-1.368l-.36-.214-3.72.97.999-3.645-.236-.375a9.817 9.817 0 01-1.499-5.186C2.186 6.58 6.591 2.18 12.004 2.18 17.41 2.18 21.814 6.58 21.814 12c0 5.41-4.404 9.818-9.81 9.818z"/>
+        </svg>
+        {opened ? "Open WhatsApp Again" : "Open WhatsApp & Send Message"}
+      </button>
+
+      {opened && (
+        <label className="wa-sent-check">
+          <input
+            type="checkbox"
+            checked={hasSent}
+            onChange={e => setHasSent(e.target.checked)}
+          />
+          <span>✅ Yes, I tapped <strong>Send</strong> in WhatsApp</span>
+        </label>
+      )}
+
+      {hasSent && (
+        <button className="btn-primary wa-done-btn" onClick={onDone}>
+          🎉 Order Confirmed — Back to Menu
+        </button>
+      )}
+
+      {!opened && (
+        <p className="wa-warning">⚠️ Your order is <strong>NOT placed</strong> until you send the WhatsApp message.</p>
+      )}
+    </div>
+  );
+}
+
 function CheckoutForm({ cart, cartTotal, paymentMode, setPaymentMode, customerName, setCustomerName,
   customerPhone, setCustomerPhone, onConfirm, onBack, error, disabled }: {
   cart: CartItem[];

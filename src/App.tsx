@@ -123,7 +123,15 @@ function App() {
       setItemFlags(cfg.item_flags ?? {});
       setConfigLoaded(true);
     });
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    // Poll config every 5 seconds so online/offline changes from admin
+    // are reflected immediately on the user page without a manual reload.
+    const poll = setInterval(() => {
+      fetchConfig().then(cfg => {
+        setSiteOnline(cfg.site_online);
+        setItemFlags(cfg.item_flags ?? {});
+      }).catch(() => {/* ignore transient errors */});
+    }, 5000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearInterval(poll); };
   }, []);
 
   const isItemEnabled = (id: string) => itemFlags[id] !== false; // default true if not set

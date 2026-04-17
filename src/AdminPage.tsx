@@ -349,8 +349,8 @@ function AdminOverview({ siteOnline, setSiteOnline, patchConfig, saving, orders,
   const stats = [
     { label: "Revenue",      value: `₹${rev}`,         Icon: TrendingUp,  color: "#E8762C", bg: "#FEF0E6" },
     { label: "Total Orders", value: `${orders.length}`, Icon: ShoppingBag, color: "#2C7BE8", bg: "#E6EFFD" },
-    { label: "Pending",      value: `${orders.length}`, Icon: Clock,       color: "#E8B22C", bg: "#FEF7E6" },
-    { label: "Delivered",    value: "0",                Icon: CheckCircle, color: "#28A745", bg: "#E6F5EA" },
+    { label: "Pending",      value: `${orders.filter((o: any) => o.deliver_status !== "delivered").length}`, Icon: Clock,       color: "#E8B22C", bg: "#FEF7E6" },
+    { label: "Delivered",    value: `${orders.filter((o: any) => o.deliver_status === "delivered").length}`, Icon: CheckCircle, color: "#28A745", bg: "#E6F5EA" },
     { label: "COD",          value: `₹${codRev}`,      Icon: Banknote,    color: "#6F42C1", bg: "#F0EBFD" },
     { label: "Prepaid",      value: `₹${preRev}`,      Icon: CreditCard,  color: "#20C997", bg: "#E6FBF6" },
   ];
@@ -848,19 +848,20 @@ const doDlv = async (status: "paid" | "unpaid" | "pending", amount?: number) => 
       {pay && <PayModal order={pay} onConfirm={doDlv} onClose={() => setPay(null)} />}
       {del && <DelConfirm order={del} onConfirm={doDel} onClose={() => setDel(null)} />}
     {toast && <div style={{ position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 8, background: "#FFF3E6", color: C.brand, fontSize: 12, fontWeight: 600, padding: "8px 16px", borderRadius: 99, boxShadow: "0 4px 16px rgba(232,118,44,.18)", border: `1px solid ${C.orange}`, maxWidth: "85vw" }}><Wifi size={13} color={C.orange} style={{ flexShrink: 0 }} />{toast}</div>}
-      {/* toolbar */}
+      {/* search — standalone full-width row for easy mobile use */}
+      <div style={{ position: "relative" }}>
+        <Search size={15} color={C.muted} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+        <input type="text" placeholder="Search by name, phone or token…" value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, paddingLeft: 38 }} />
+      </div>
+      {/* toolbar — action buttons row */}
       <div style={{ display: "flex", gap: 8 }}>
-        <div style={{ position: "relative", flex: 1 }}>
-          <Search size={15} color={C.muted} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={inputStyle} />
-        </div>
         <button onClick={onRefresh} disabled={loading || busy} style={{ ...btn("ghost"), padding: "0 13px", fontSize: 15, opacity: loading ? .5 : 1 }}>{loading ? "…" : "↻"}</button>
-        <button onClick={doExport} disabled={busy || orders.length === 0} style={{ ...btn("orange"), padding: "0 13px", fontSize: 12, opacity: orders.length === 0 ? .5 : 1 }}><Download size={13} />Export</button>
+        <button onClick={doExport} disabled={busy || orders.length === 0} style={{ ...btn("orange"), flex: 1, padding: "0 13px", fontSize: 12, opacity: orders.length === 0 ? .5 : 1 }}><Download size={13} />Export</button>
         <button
           onClick={doClear}
           disabled={!exported || busy || orders.length === 0}
           title={!exported ? "Export first to enable Clear" : "Clear all orders from DB"}
-          style={{ ...btn(exported ? "red" : "ghost"), padding: "0 13px", fontSize: 12, opacity: exported && orders.length > 0 ? 1 : .4, cursor: exported && orders.length > 0 ? "pointer" : "not-allowed" }}
+          style={{ ...btn(exported ? "red" : "ghost"), flex: 1, padding: "0 13px", fontSize: 12, opacity: exported && orders.length > 0 ? 1 : .4, cursor: exported && orders.length > 0 ? "pointer" : "not-allowed" }}
         ><Trash2 size={13} />Clear</button>
       </div>
       {/* summary */}

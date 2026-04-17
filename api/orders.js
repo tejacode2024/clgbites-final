@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
+// ── Guard: catch missing env vars immediately so the error is obvious ──
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+  console.error(
+    '[orders] FATAL: SUPABASE_URL or SUPABASE_SERVICE_KEY is not set. ' +
+    'Add both env vars in Vercel → Project Settings → Environment Variables, then redeploy.'
+  )
+}
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
@@ -23,7 +31,13 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     // Step 1: Atomically claim the next token number from the dedicated sequence.
     const { data: tokenData, error: tokenError } = await supabase.rpc('next_order_token')
-    if (tokenError) return res.status(500).json({ error: tokenError })
+    if (tokenError) {
+      console.error('[orders POST] next_order_token RPC failed:', tokenError)
+      return res.status(500).json({
+        error: tokenError,
+        hint: 'Make sure you ran supabase-schema.sql in the Supabase SQL Editor to create the next_order_token function and order_token_seq sequence.'
+      })
+    }
 
     const tokenNumber = tokenData  // nextval() returns a scalar bigint
 
@@ -33,7 +47,13 @@ export default async function handler(req, res) {
       .insert([{ ...req.body, token_number: tokenNumber }])
       .select()
 
-    if (error) return res.status(500).json({ error })
+    if (error) {
+      console.error('[orders POST] insert failed:', error)
+      return res.status(500).json({
+        error,
+        hint: 'If this is a permissions error, make sure SUPABASE_SERVICE_KEY in Vercel is the service_role key (not the anon key).'
+      })
+    }
 
     // Return the inserted row — orderId == token_number == what the frontend shows.
     const row = Array.isArray(data) ? data[0] : data

@@ -108,7 +108,7 @@ function OrderPanel({
   cart, cartTotal, addItem, removeItem, siteOnline,
   custName, setCustName, custPhone, setCustPhone,
   custMode, setCustMode, custLocked, setCustLocked,
-  onOrderDone,
+  onClose, onOrderDone,
 }: {
   cart: CartItem[]; cartTotal: number;
   addItem: (item: { id: string; name: string; price: number; img: string }) => void;
@@ -423,6 +423,7 @@ function App() {
               custPhone={custPhone} setCustPhone={setCustPhone}
               custMode={custMode} setCustMode={setCustMode}
               custLocked={custLocked} setCustLocked={setCustLocked}
+              onClose={() => setCartOpen(false)}
               onOrderDone={() => { setCart([]); setCustName(""); setCustPhone(""); setCustMode("cod"); setCustLocked(false); setCartOpen(false); }}
             />
           </div>
